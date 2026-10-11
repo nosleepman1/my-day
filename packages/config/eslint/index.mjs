@@ -195,7 +195,13 @@ export function orbitEslint({ rootDir }) {
     },
     // Lecture de l'environnement autorisée uniquement dans la configuration, les outils et les tests.
     {
-      files: ['apps/api/src/platform/config/**', ...TOOL_CONFIG_FILES, 'apps/api/test/**', 'e2e/**'],
+      files: [
+        'apps/api/src/platform/config/**',
+        ...TOOL_CONFIG_FILES,
+        'apps/api/test/**',
+        'e2e/**',
+        'infra/scripts/**',
+      ],
       rules: { 'no-restricted-properties': 'off' },
     },
     // Fichiers de configuration d'outils : export par défaut attendu.
