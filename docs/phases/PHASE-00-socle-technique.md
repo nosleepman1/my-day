@@ -1,6 +1,6 @@
 # PHASE-00 : Socle technique
 
-- **Statut :** À faire
+- **Statut :** Terminée (rapport : docs/progress/PHASE-00-REPORT.md)
 - **Dépend de :** aucune
 - **Accès :** Tous
 - **Estimation :** 3 à 4 jours effectifs
