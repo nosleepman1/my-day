@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { server } from '@/test/msw-server';
 
-import { ApiError, http, NetworkError } from './client';
+import { ApiError, ContractError, http, NetworkError } from './client';
 
 const StatusSchema = z.object({ data: z.object({ status: z.literal('ok') }) });
 
@@ -68,5 +68,39 @@ describe('http client (FRONTEND.md §3)', () => {
     server.use(mswHttp.get('/api/v1/offline', () => HttpResponse.error()));
 
     await expect(http('/offline', StatusSchema)).rejects.toBeInstanceOf(NetworkError);
+  });
+
+  it('rejects a 2xx body that breaks the contract with ContractError', async () => {
+    server.use(mswHttp.get('/api/v1/odd', () => HttpResponse.json({ data: { status: 'maybe' } })));
+
+    await expect(http('/odd', StatusSchema)).rejects.toBeInstanceOf(ContractError);
+  });
+
+  it('keeps an unknown error code as UNKNOWN with its requestId', async () => {
+    server.use(
+      mswHttp.get('/api/v1/future', () =>
+        HttpResponse.json(
+          { error: { code: 'BRAND_NEW_CODE', message: 'x', requestId: 'req-9' } },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    await expect(http('/future', StatusSchema)).rejects.toMatchObject({
+      code: 'UNKNOWN',
+      requestId: 'req-9',
+    });
+  });
+
+  it('propagates a caller cancellation instead of reporting a network failure', async () => {
+    server.use(mswHttp.get('/api/v1/slow', () => HttpResponse.json({ data: { status: 'ok' } })));
+    const controller = new AbortController();
+    controller.abort(new DOMException('cancelled', 'AbortError'));
+
+    const error = await http('/slow', StatusSchema, { signal: controller.signal }).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).not.toBeInstanceOf(NetworkError);
+    expect(error).toMatchObject({ name: 'AbortError' });
   });
 });
