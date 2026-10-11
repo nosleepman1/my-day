@@ -91,7 +91,7 @@ Format de réponse et d'erreur : `API.md`.
 | T3 | `packages/contracts` : enveloppes, codes d'erreur, `MoneyString`, UUIDv7, pagination | T1 |
 | T4 | `apps/api` : NestJS Express, préfixe `/api/v1`, config Zod, Helmet, arrêt gracieux, `main.ts` + `worker.ts` | T3 |
 | T5 | Logger pino avec `requestId` et redaction ; filtre d'exception global et enveloppe d'erreur ; tests | T4 |
-| T6 | Docker Compose dev (Postgres 16, Mailpit) ; Prisma, `PrismaService`, migration `0000_init_extensions`, UUIDv7 | T4 |
+| T6 | Docker Compose dev (Postgres 17, Mailpit) ; Prisma, `PrismaService`, migration `0000_init_extensions`, UUIDv7 | T4 |
 | T7 | Endpoints health/ready ; helper Testcontainers ; tests d'intégration | T5, T6 |
 | T8 | `apps/web` : Vite, React, Tailwind, Router, TanStack Query, client HTTP, page technique, proxy `/api` | T3 |
 | T9 | Tests d'architecture (dependency-cruiser, règles ESLint `$queryRaw`, montants, `console.log`) avec fixtures fautives | T4, T8 |
