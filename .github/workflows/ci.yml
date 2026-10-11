@@ -1,4 +1,5 @@
 # CI de base (PHASE-00, INFRASTRUCTURE.md 8). Bloquante sur chaque pull request.
+# Actions tierces epinglees par SHA de commit (INFRASTRUCTURE.md, chaine d approvisionnement).
 name: ci
 
 on:
@@ -14,18 +15,32 @@ permissions:
   contents: read
 
 jobs:
+  secrets:
+    name: secret scanning (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   quality:
     name: lint, types, tests, build
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Dependency audit (high and critical block)
+        run: pnpm audit --audit-level high
       - run: pnpm format:check
       - run: pnpm build:packages
       - run: pnpm lint
@@ -54,25 +69,28 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       CI: 'true'
-      E2E_DATABASE_URL: postgresql://orbit_owner:ci_only_password@localhost:5433/orbit
+      OWNER_DATABASE_URL: postgresql://orbit_owner:ci_only_password@localhost:5433/orbit
+      E2E_DATABASE_URL: postgresql://orbit_app:ci_only_app_password@localhost:5433/orbit
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:packages
-      - name: Apply migrations
+      - name: Apply migrations as owner
         working-directory: apps/api
         env:
-          DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
-          DATABASE_MIGRATION_URL: ${{ env.E2E_DATABASE_URL }}
+          DATABASE_URL: ${{ env.OWNER_DATABASE_URL }}
+          DATABASE_MIGRATION_URL: ${{ env.OWNER_DATABASE_URL }}
         run: pnpm exec prisma migrate deploy
+      - name: Allow the application role to log in (provisioning step)
+        run: psql "$OWNER_DATABASE_URL" -c "ALTER ROLE orbit_app LOGIN PASSWORD 'ci_only_app_password'"
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: playwright-report
