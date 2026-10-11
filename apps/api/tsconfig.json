@@ -4,5 +4,6 @@
     "rootDir": ".",
     "types": ["node", "vitest/importMeta"]
   },
-  "include": ["src", "test", "prisma/seed", "*.config.ts"]
+  "include": ["src", "test", "prisma/seed", "*.config.ts"],
+  "exclude": ["test/architecture/__fixtures__"]
 }
