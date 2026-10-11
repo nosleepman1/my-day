@@ -38,6 +38,10 @@ describe('toApiError (API.md §5)', () => {
     [new HttpException('x', 413), 413, 'PAYLOAD_TOO_LARGE'],
     [new HttpException('x', 415), 415, 'UNSUPPORTED_MEDIA_TYPE'],
     [new HttpException('x', 429), 429, 'RATE_LIMITED'],
+    [new HttpException('x', 403), 404, 'NOT_FOUND'],
+    [new HttpException('x', 409), 409, 'CONFLICT'],
+    [new HttpException('x', 422), 422, 'BUSINESS_RULE_VIOLATION'],
+    [new HttpException('x', 503), 503, 'SERVICE_UNAVAILABLE'],
     [new HttpException('x', 401), 401, 'UNAUTHENTICATED'],
     [new HttpException('x', 418), 500, 'INTERNAL_ERROR'],
   ])('maps the framework exception %o', (exception, status, code) => {
@@ -60,9 +64,15 @@ describe('toApiError (API.md §5)', () => {
     ['P2002', 409, 'CONFLICT'],
     ['P2003', 404, 'NOT_FOUND'],
     ['P2025', 404, 'NOT_FOUND'],
+    ['P2024', 503, 'SERVICE_UNAVAILABLE'],
     ['P2034', 500, 'INTERNAL_ERROR'],
   ])('maps the Prisma error %s (API.md §5.3)', (code, status, apiCode) => {
     expect(toApiError(prismaError(code))).toMatchObject({ status, code: apiCode });
+  });
+
+  it('maps an unreachable database to SERVICE_UNAVAILABLE', () => {
+    const error = new Prisma.PrismaClientInitializationError("Can't reach database server", 'test');
+    expect(toApiError(error)).toMatchObject({ status: 503, code: 'SERVICE_UNAVAILABLE' });
   });
 
   it('hides unexpected errors behind INTERNAL_ERROR without leaking the message', () => {

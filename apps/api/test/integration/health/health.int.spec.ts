@@ -28,12 +28,20 @@ describe('health and HTTP platform (PHASE-00)', () => {
     expect(response.body).toEqual({ data: { status: 'ok' } });
   });
 
-  it('sets security headers and hides the framework', async () => {
+  function expectSecurityHeaders(headers: Record<string, string | undefined>): void {
+    expect(headers['x-content-type-options']).toBe('nosniff');
+    expect(headers['content-security-policy']).toContain("default-src 'none'");
+    expect(headers['content-security-policy']).toContain('sandbox');
+    expect(headers['strict-transport-security']).toBe('max-age=63072000; includeSubDomains');
+    expect(headers['cache-control']).toBe('no-store');
+    expect(headers['permissions-policy']).toContain('camera=()');
+    expect(headers['x-request-id']).toMatch(UUID_V7);
+    expect(headers['x-powered-by']).toBeUndefined();
+  }
+
+  it('sets security headers and hides the framework (SECURITY.md §3.10)', async () => {
     const response = await request(app.getHttpServer()).get('/api/v1/health/live');
-    expect(response.headers['x-content-type-options']).toBe('nosniff');
-    expect(response.headers['content-security-policy']).toContain("default-src 'none'");
-    expect(response.headers['strict-transport-security']).toBeDefined();
-    expect(response.headers['x-powered-by']).toBeUndefined();
+    expectSecurityHeaders(response.headers);
   });
 
   it('echoes a well-formed incoming X-Request-Id', async () => {
@@ -58,6 +66,8 @@ describe('health and HTTP platform (PHASE-00)', () => {
       .send('{"broken":');
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('INVALID_JSON');
+    expect(response.body.error.requestId).toBe(response.headers['x-request-id']);
+    expectSecurityHeaders(response.headers);
   });
 
   it('refuses JSON bodies above 1 MB with PAYLOAD_TOO_LARGE (API.md §11)', async () => {
@@ -67,6 +77,8 @@ describe('health and HTTP platform (PHASE-00)', () => {
       .send(JSON.stringify({ blob: 'x'.repeat(1_100_000) }));
     expect(response.status).toBe(413);
     expect(response.body.error.code).toBe('PAYLOAD_TOO_LARGE');
+    expect(response.body.error.requestId).toBe(response.headers['x-request-id']);
+    expectSecurityHeaders(response.headers);
   });
 });
 

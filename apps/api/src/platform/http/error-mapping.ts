@@ -26,17 +26,35 @@ const DEFAULT_MESSAGES: Partial<Record<ErrorCode, string>> = {
   UNSUPPORTED_MEDIA_TYPE: 'Type de contenu non accepté.',
   RATE_LIMITED: 'Trop de requêtes. Réessayez plus tard.',
   SERVICE_UNAVAILABLE: 'Service momentanément indisponible.',
+  GONE: 'Ce lien ou cette ressource a expiré.',
+  VERSION_CONFLICT: 'La ressource a été modifiée entre-temps.',
+  PRECONDITION_REQUIRED: 'Version de la ressource requise.',
+  BUSINESS_RULE_VIOLATION: 'Cette opération est refusée.',
+  UPSTREAM_ERROR: 'Un service externe est en erreur.',
+  UPSTREAM_TIMEOUT: 'Un service externe ne répond pas.',
 };
 
-/** Statuts des exceptions du framework (routes inconnues, etc.) → codes d'API. */
+/**
+ * Statuts des exceptions du framework (routes inconnues, guards…) → codes d'API.
+ * 403 devient NOT_FOUND : une route ou une ressource interdite ne confirme jamais son existence (SECURITY.md §6.2).
+ */
 const HTTP_STATUS_TO_CODE: Readonly<Record<number, ErrorCode>> = {
   400: 'VALIDATION_FAILED',
   401: 'UNAUTHENTICATED',
+  403: 'NOT_FOUND',
   404: 'NOT_FOUND',
   405: 'METHOD_NOT_ALLOWED',
+  409: 'CONFLICT',
+  410: 'GONE',
+  412: 'VERSION_CONFLICT',
   413: 'PAYLOAD_TOO_LARGE',
   415: 'UNSUPPORTED_MEDIA_TYPE',
+  422: 'BUSINESS_RULE_VIOLATION',
+  428: 'PRECONDITION_REQUIRED',
   429: 'RATE_LIMITED',
+  502: 'UPSTREAM_ERROR',
+  503: 'SERVICE_UNAVAILABLE',
+  504: 'UPSTREAM_TIMEOUT',
 };
 
 /** Erreurs émises par body-parser (Express) avant le routage. */

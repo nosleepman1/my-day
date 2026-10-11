@@ -46,7 +46,13 @@ describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
   it('reads secrets from *_FILE in deployed environments', () => {
     const { DATABASE_URL: _plain, ...rest } = VALID;
     const env = loadEnv(
-      { ...rest, NODE_ENV: 'production', APP_ENV: 'staging', DATABASE_URL_FILE: '/run/secrets/database_url' },
+      {
+        ...rest,
+        NODE_ENV: 'production',
+        APP_ENV: 'staging',
+        APP_ORIGIN: 'https://orbit.example.com',
+        DATABASE_URL_FILE: '/run/secrets/database_url',
+      },
       (path) => (path === '/run/secrets/database_url' ? 'postgresql://orbit_app:fake@db:5432/orbit\n' : ''),
     );
     expect(env.DATABASE_URL).toBe('postgresql://orbit_app:fake@db:5432/orbit');
@@ -66,5 +72,33 @@ describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
         () => VALID.DATABASE_URL,
       ),
     ).toThrow(/LOG_LEVEL/);
+  });
+
+  it('refuses an inconsistent NODE_ENV / APP_ENV pair', () => {
+    expect(() => loadEnv({ ...VALID, NODE_ENV: 'production', APP_ENV: 'local' }, noSecretFile)).toThrow(
+      /NODE_ENV/,
+    );
+  });
+
+  it('requires APP_ORIGIN to be a bare origin, in https once deployed', () => {
+    expect(() => loadEnv({ ...VALID, APP_ORIGIN: 'http://localhost:5173/app' }, noSecretFile)).toThrow(
+      /APP_ORIGIN/,
+    );
+    const { DATABASE_URL: _plain, ...rest } = VALID;
+    expect(() =>
+      loadEnv(
+        { ...rest, NODE_ENV: 'production', APP_ENV: 'production', DATABASE_URL_FILE: '/x' },
+        () => VALID.DATABASE_URL,
+      ),
+    ).toThrow(/APP_ORIGIN/);
+  });
+
+  it('reports an unreadable secret file without leaking its content', () => {
+    const { DATABASE_URL: _plain, ...rest } = VALID;
+    expect(() =>
+      loadEnv({ ...rest, DATABASE_URL_FILE: '/missing' }, () => {
+        throw new Error('ENOENT: /missing');
+      }),
+    ).toThrow(ConfigurationError);
   });
 });

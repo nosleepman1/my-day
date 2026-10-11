@@ -7,6 +7,7 @@ import { HealthResponseSchema, type HealthResponse } from '@orbit/contracts';
 import { PrismaService } from '../database/prisma.service';
 import { pingDatabase } from '../database/raw/health.queries';
 import { DomainError } from '../errors/domain-error';
+import { defaultMessageOf } from '../http/error-mapping';
 
 class HealthResponseDto extends createZodDto(HealthResponseSchema) {}
 
@@ -33,7 +34,7 @@ export class HealthController {
       await pingDatabase(this.prisma);
     } catch (error: unknown) {
       this.logger.warn({ err: error }, 'health.database_unreachable');
-      throw new DomainError('SERVICE_UNAVAILABLE', 'Service momentanément indisponible.', undefined);
+      throw new DomainError('SERVICE_UNAVAILABLE', defaultMessageOf('SERVICE_UNAVAILABLE'));
     }
     return OK;
   }
