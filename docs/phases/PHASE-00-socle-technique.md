@@ -58,7 +58,7 @@ Ne pas charger `PRODUCT_SPEC.md`.
 ## 5. API
 | Méthode | Route | Rôle | Remarque |
 |---|---|---|---|
-| GET | `/api/v1/health/live` | Public | `{ status: "ok", version, uptime }` |
+| GET | `/api/v1/health/live` | Public | `{ data: { status: "ok" } }`, sans version ni détail interne (API.md) |
 | GET | `/api/v1/health/ready` | Public | 200 si PostgreSQL répond, 503 sinon (enveloppe d'erreur) |
 
 Format de réponse et d'erreur : `API.md`.
