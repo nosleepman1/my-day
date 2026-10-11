@@ -18,16 +18,25 @@ const TEST_ENV = {
 
 /**
  * Démarre l'application réelle (guards, pipes, filtres, en-têtes) sur la base de test Testcontainers.
- * La configuration passe par `process.env`, comme en production, puis est validée par `loadEnv`.
+ * La configuration passe par `process.env`, comme en production, puis est validée par `loadEnv` ;
+ * `process.env` est restauré ensuite pour qu'aucune surcharge ne fuie vers les tests suivants.
  */
 export async function createTestApp(
   overrides: Readonly<Record<string, string>> = {},
 ): Promise<INestApplication> {
+  const previous = { ...process.env };
   Object.assign(process.env, TEST_ENV, { DATABASE_URL: inject('databaseUrl') }, overrides);
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
-  app.useLogger(app.get(Logger));
-  configureHttp(app, app.get<Env>(APP_CONFIG));
-  await app.init();
-  return app;
+  try {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
+    app.useLogger(app.get(Logger));
+    configureHttp(app, app.get<Env>(APP_CONFIG));
+    await app.init();
+    return app;
+  } finally {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in previous)) Reflect.deleteProperty(process.env, key);
+    }
+    Object.assign(process.env, previous);
+  }
 }

@@ -148,9 +148,9 @@ export function orbitEslint({ rootDir }) {
       files: API_MONEY_STRICT_FILES,
       rules: { 'no-restricted-syntax': syntaxFor(BASE, RAW_SQL, MONEY_STRICT, API_MODULES) },
     },
-    // Seul dossier autorisé pour le SQL brut (ADR-028).
+    // Seul dossier autorisé pour le SQL brut (ADR-028), plus les tests de l'API (sondes de privilèges, fixtures).
     {
-      files: ['apps/api/src/platform/database/raw/**'],
+      files: ['apps/api/src/platform/database/raw/**', 'apps/api/test/**'],
       rules: { 'no-restricted-syntax': syntaxFor(BASE, MONEY_LENIENT) },
     },
     // Paquets partagés : aucune dépendance de framework (ARCHITECTURE.md §5).
