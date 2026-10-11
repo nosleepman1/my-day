@@ -18,6 +18,8 @@ allowBuilds:
   cpu-features: false
   protobufjs: false
   ssh2: false
+  # Service worker MSW pour le navigateur : inutile, MSW sert uniquement en Node dans les tests.
+  msw: false
 
 # Versions publiees depuis moins longtemps que le delai minimal de pnpm, acceptees explicitement.
 minimumReleaseAgeExclude:
@@ -35,3 +37,5 @@ minimumReleaseAgeExclude:
   - '@swc/core-win32-ia32-msvc@1.16.18'
   - '@swc/core-win32-x64-msvc@1.16.18'
   - '@swc/core@1.16.18'
+  - '@tanstack/query-core@5.104.2'
+  - '@tanstack/react-query@5.104.2'

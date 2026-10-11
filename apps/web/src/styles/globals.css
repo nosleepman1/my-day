@@ -1,0 +1,12 @@
+@import 'tailwindcss';
+
+/* Les tokens du design system (DESIGN_SYSTEM.md) arrivent en PHASE-02. */
+:root {
+  color-scheme: light dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
