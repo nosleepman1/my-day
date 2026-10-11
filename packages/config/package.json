@@ -1,0 +1,11 @@
+{
+  "name": "@orbit/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig/*": "./tsconfig/*",
+    "./eslint": "./eslint/index.mjs",
+    "./prettier": "./prettier/index.mjs"
+  }
+}
