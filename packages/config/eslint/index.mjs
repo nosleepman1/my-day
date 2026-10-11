@@ -199,7 +199,7 @@ export function orbitEslint({ rootDir }) {
       rules: { 'react-hooks/rules-of-hooks': 'error', 'react-hooks/exhaustive-deps': 'error' },
     },
     { files: ['apps/web/src/**/*.tsx'], ...jsxA11y.flatConfigs.recommended },
-    // Tests : tailles libres.
+    // Tests : tailles libres ; les matchers asymétriques de Vitest sont typés `any`.
     {
       files: TEST_FILES,
       rules: {
@@ -207,6 +207,9 @@ export function orbitEslint({ rootDir }) {
         'max-lines': 'off',
         '@typescript-eslint/no-non-null-assertion': 'off',
         '@typescript-eslint/unbound-method': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+        'no-restricted-imports': ['error', { paths: BANNED_EVERYWHERE }],
       },
     },
   );
