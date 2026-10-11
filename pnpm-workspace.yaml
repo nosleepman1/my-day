@@ -39,3 +39,7 @@ minimumReleaseAgeExclude:
   - '@swc/core@1.16.18'
   - '@tanstack/query-core@5.104.2'
   - '@tanstack/react-query@5.104.2'
+
+# Correctifs de securite transitifs (pnpm audit), a retirer quand les dependances directes les integrent.
+overrides:
+  deepmerge-ts: 8.0.2
