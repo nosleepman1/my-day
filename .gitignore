@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Environment & secrets (never commit real values; .env.example is allowed)
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# Local data
+*.log
+.data/
+storage/
+
+# Tooling
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+playwright-report/
+test-results/
