@@ -26,7 +26,8 @@
     "db:seed": "pnpm --filter @orbit/api db:seed",
     "infra:up": "docker compose -f infra/compose/compose.dev.yml up -d --wait",
     "infra:down": "docker compose -f infra/compose/compose.dev.yml down",
-    "infra:reset": "docker compose -f infra/compose/compose.dev.yml down -v && pnpm infra:up && pnpm db:migrate && pnpm db:seed"
+    "infra:reset": "docker compose -f infra/compose/compose.dev.yml down -v && pnpm infra:up && pnpm db:migrate && pnpm db:seed",
+    "ci:local": "node infra/scripts/ci-local.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "19.8.1",

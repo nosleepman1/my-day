@@ -59,6 +59,7 @@ pnpm dev
 | `pnpm test:e2e` | Tests de bout en bout Playwright (base de développement démarrée et migrée) |
 | `pnpm infra:down` / `pnpm infra:reset` | Arrêter, ou réinitialiser la base locale |
 | `pnpm build` | Build des paquets, de l'API (SWC) et du front (Vite) |
+| `pnpm ci:local` | Rejoue toute la CI en local (audit, lint, types, tests, build, E2E isolé sur une base Docker dédiée) |
 
 ## Documentation
 
