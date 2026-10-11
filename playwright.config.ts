@@ -2,6 +2,12 @@ import { defineConfig, devices } from '@playwright/test';
 
 const isCi = process.env['CI'] === 'true';
 
+/** Ports surchargeables : la CI auto-hébergée tourne sur des ports dédiés pour ne pas heurter le poste de dev. */
+const apiPort = process.env['E2E_API_PORT'] ?? '3000';
+const webPort = process.env['E2E_WEB_PORT'] ?? '5173';
+const apiUrl = `http://localhost:${apiPort}`;
+const webUrl = `http://localhost:${webPort}`;
+
 /** Base de données de l'API pendant l'E2E : la base de développement locale (Docker Compose), ou celle de la CI. */
 const e2eDatabaseUrl =
   process.env['E2E_DATABASE_URL'] ?? 'postgresql://orbit_app:orbit_dev_only@localhost:5433/orbit';
@@ -18,7 +24,7 @@ export default defineConfig({
   retries: isCi ? 1 : 0,
   reporter: isCi ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: webUrl,
     locale: 'fr-FR',
     timezoneId: 'Africa/Dakar',
     trace: 'on-first-retry',
@@ -30,23 +36,24 @@ export default defineConfig({
   webServer: [
     {
       command: 'pnpm --filter @orbit/api build && pnpm --filter @orbit/api start',
-      url: 'http://localhost:3000/api/v1/health/live',
+      url: `${apiUrl}/api/v1/health/live`,
       reuseExistingServer: !isCi,
       timeout: 120_000,
       env: {
         NODE_ENV: 'test',
         APP_ENV: 'test',
-        PORT: '3000',
-        APP_ORIGIN: 'http://localhost:5173',
+        PORT: apiPort,
+        APP_ORIGIN: webUrl,
         LOG_LEVEL: 'warn',
         DATABASE_URL: e2eDatabaseUrl,
       },
     },
     {
       command: 'pnpm --filter @orbit/web dev',
-      url: 'http://localhost:5173',
+      url: webUrl,
       reuseExistingServer: !isCi,
       timeout: 120_000,
+      env: { WEB_PORT: webPort, API_PROXY_TARGET: apiUrl },
     },
   ],
 });

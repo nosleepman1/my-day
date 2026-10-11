@@ -8,7 +8,12 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  server: { port: 5173, strictPort: true, proxy: { '/api': 'http://localhost:3000' } },
+  // Ports surchargeables (WEB_PORT, API_PROXY_TARGET) pour que la CI auto-hébergée ne heurte pas le poste de dev.
+  server: {
+    port: Number.parseInt(process.env['WEB_PORT'] ?? '5173', 10),
+    strictPort: true,
+    proxy: { '/api': process.env['API_PROXY_TARGET'] ?? 'http://localhost:3000' },
+  },
   test: {
     environment: 'happy-dom',
     globals: false,
