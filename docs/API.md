@@ -148,6 +148,8 @@ Notées dans la colonne « Rôle » du catalogue :
 | 422 | `INSUFFICIENT_FUNDS` | Débit qui rendrait le solde négatif sur un compte sans découvert autorisé (H3). | `{ accountId, availableMinor, currency }` |
 | 422 | `CURRENCY_MISMATCH` | Devises incompatibles sans conversion explicite. | `{ expected, received }` |
 | 422 | `OVERPAYMENT` | Remboursement ou paiement supérieur au solde restant. | `{ remainingMinor, currency }` |
+| 422 | `AMOUNT_OUT_OF_RANGE` | Montant saisi supérieur à 10^18 unités mineures (FINANCE_RULES §2.1). | — |
+| 422 | `BALANCE_OUT_OF_RANGE` | Solde ou total hors de la plage BIGINT (FINANCE_RULES §2.1). | — |
 | 422 | `CIRCULAR_DEPENDENCY` | Dépendance de tâche qui crée un cycle. | — |
 | 422 | `REFERENCE_INVALID` | Référence vers une entité archivée ou d'un type incompatible (l'entité d'autrui reste `404`). | `{ field }` |
 | 428 | `PRECONDITION_REQUIRED` | `If-Match` absent sur une route qui l'exige. | — |
@@ -177,7 +179,7 @@ Ajouter un code = modifier `packages/contracts/errors.ts` **et** ce tableau dans
 ```
 
 - Le suffixe `Minor` est obligatoire dans les noms de champ (`amountMinor`, `openingBalanceMinor`, `balanceMinor`, `remainingMinor`, `unitPriceMinor`). `"1050"` en EUR vaut 10,50 €.
-- Format : `^-?(0|[1-9][0-9]{0,17})$` (18 chiffres max, compatible `BIGINT`). Les montants saisis (transactions, dettes, paiements) sont **strictement positifs** : `^[1-9][0-9]{0,17}$`. Les soldes calculés peuvent être négatifs.
+- Format : `^-?(0|[1-9][0-9]{0,18})$`, dans la plage `BIGINT`. Les montants saisis (transactions, dettes, paiements) sont **strictement positifs** et au plus 10^18 : `^[1-9][0-9]{0,18}$` (`PositiveMoneyStringSchema`). Les soldes calculés peuvent être négatifs.
 - Interdits : `number` JSON, décimales, séparateurs, exposant. Le front convertit via `packages/money`.
 - Taux et quantités (`NUMERIC`) : chaîne décimale à point (`"655.957"`, `"1.500"`), précision fixée par ADR-008.
 

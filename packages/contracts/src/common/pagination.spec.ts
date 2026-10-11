@@ -11,7 +11,7 @@ describe('PaginationQuerySchema (API.md §7)', () => {
     expect(PaginationQuerySchema.parse({ limit: '50', cursor: 'abc' })).toEqual({ limit: 50, cursor: 'abc' });
   });
 
-  it.each(['0', '101', '2.5', 'x'])('rejects limit=%j', (limit) => {
+  it.each(['0', '101', '2.5', 'x', '0x10', '1e1'])('rejects limit=%j', (limit) => {
     expect(PaginationQuerySchema.safeParse({ limit }).success).toBe(false);
   });
 });
