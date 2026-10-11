@@ -2,10 +2,10 @@ packages:
   - apps/*
   - packages/*
 
-# Versions exactes dans les package.json (CODING_STANDARDS, dépendances verrouillées).
+# Versions exactes dans les package.json (dependances verrouillees).
 saveExact: true
 
-# Seuls ces paquets peuvent exécuter des scripts d'installation (binaires natifs, hooks Git).
+# Seuls ces paquets peuvent executer des scripts d installation (binaires natifs, hooks Git).
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
@@ -14,6 +14,24 @@ allowBuilds:
   lefthook: true
   prisma: true
   unrs-resolver: true
+  # Binaires natifs optionnels de Testcontainers (ssh2) : inutiles ici.
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
 
+# Versions publiees depuis moins longtemps que le delai minimal de pnpm, acceptees explicitement.
 minimumReleaseAgeExclude:
   - zod@4.6.6
+  - '@swc/core-darwin-arm64@1.16.18'
+  - '@swc/core-darwin-x64@1.16.18'
+  - '@swc/core-linux-arm-gnueabihf@1.16.18'
+  - '@swc/core-linux-arm64-gnu@1.16.18'
+  - '@swc/core-linux-arm64-musl@1.16.18'
+  - '@swc/core-linux-ppc64-gnu@1.16.18'
+  - '@swc/core-linux-s390x-gnu@1.16.18'
+  - '@swc/core-linux-x64-gnu@1.16.18'
+  - '@swc/core-linux-x64-musl@1.16.18'
+  - '@swc/core-win32-arm64-msvc@1.16.18'
+  - '@swc/core-win32-ia32-msvc@1.16.18'
+  - '@swc/core-win32-x64-msvc@1.16.18'
+  - '@swc/core@1.16.18'

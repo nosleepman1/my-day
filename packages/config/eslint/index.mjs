@@ -84,6 +84,15 @@ export function orbitEslint({ rootDir }) {
         ],
         '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
         '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
+        '@typescript-eslint/no-unused-vars': [
+          'error',
+          {
+            argsIgnorePattern: '^_',
+            varsIgnorePattern: '^_',
+            destructuredArrayIgnorePattern: '^_',
+            ignoreRestSiblings: true,
+          },
+        ],
         'no-console': 'error',
         'no-param-reassign': ['error', { props: true }],
         'prefer-const': 'error',
@@ -209,6 +218,7 @@ export function orbitEslint({ rootDir }) {
         '@typescript-eslint/unbound-method': 'off',
         '@typescript-eslint/no-unsafe-argument': 'off',
         '@typescript-eslint/no-unsafe-assignment': 'off',
+        '@typescript-eslint/no-unsafe-member-access': 'off',
         'no-restricted-imports': ['error', { paths: BANNED_EVERYWHERE }],
       },
     },
