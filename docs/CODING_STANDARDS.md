@@ -52,7 +52,7 @@
 
 | Fichier | Étend `base.json` avec | Utilisé par |
 |---|---|---|
-| `node.json` | `"module": "Node16"`, `"moduleResolution": "Node16"`, `"experimentalDecorators": true`, `"emitDecoratorMetadata": true`, `"exactOptionalPropertyTypes": false` (types générés par Prisma incompatibles), `"outDir": "dist"` | `apps/api` |
+| `node.json` | `"module": "ESNext"`, `"moduleResolution": "Bundler"`, `"noEmit": true` (vérification de types seule : SWC compile l’API en CommonJS, Vitest exécute en ESM), `"experimentalDecorators": true`, `"emitDecoratorMetadata": true`, `"exactOptionalPropertyTypes": false` (types générés par Prisma incompatibles), `"outDir": "dist"` | `apps/api` |
 | `react.json` | `"module": "ESNext"`, `"moduleResolution": "Bundler"`, `"jsx": "react-jsx"`, `"lib": ["ES2022", "DOM", "DOM.Iterable"]`, `"verbatimModuleSyntax": true`, `"noEmit": true` | `apps/web` |
 | `library.json` | `"module": "ESNext"`, `"moduleResolution": "Bundler"`, `"declaration": true`, `"verbatimModuleSyntax": true` | `packages/contracts`, `packages/money` (build tsup ESM + CJS) |
 

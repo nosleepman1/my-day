@@ -123,7 +123,7 @@ services:
       POSTGRES_USER: orbit_owner
       POSTGRES_PASSWORD: orbit_dev_only  # valeur locale fictive
       POSTGRES_DB: orbit
-    ports: ["127.0.0.1:5432:5432"]       # jamais 0.0.0.0
+    ports: ["127.0.0.1:5433:5432"]       # jamais 0.0.0.0 ; 5433 evite un PostgreSQL local deja installe
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro   # crée le rôle orbit_app
@@ -532,8 +532,8 @@ PORT=3000
 APP_ORIGIN=http://localhost:5173
 API_PUBLIC_URL=http://localhost:3000
 LOG_LEVEL=debug
-DATABASE_URL=postgresql://orbit_app:orbit_dev_only@localhost:5432/orbit
-DATABASE_MIGRATION_URL=postgresql://orbit_owner:orbit_dev_only@localhost:5432/orbit
+DATABASE_URL=postgresql://orbit_app:orbit_dev_only@localhost:5433/orbit
+DATABASE_MIGRATION_URL=postgresql://orbit_owner:orbit_dev_only@localhost:5433/orbit
 STORAGE_DRIVER=fs
 STORAGE_FS_ROOT=./.data/storage
 

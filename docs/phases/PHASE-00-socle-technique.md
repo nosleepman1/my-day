@@ -32,7 +32,7 @@ Ne pas charger `PRODUCT_SPEC.md`.
 - `apps/web` : Vite + React + TypeScript strict, Tailwind CSS, React Router, TanStack Query, client HTTP unique (préfixe `/api/v1`, en-tête `X-Requested-With: orbit`, `credentials: 'include'`, lecture de l'enveloppe d'erreur), page d'accueil technique affichant l'état de `/health/live`. Proxy Vite `/api` → API (même origine, ADR-006).
 - Docker Compose dev : `postgres:17` (volume nommé), `mailpit` (ADR-014). Les apps tournent sur l'hôte (`pnpm dev`).
 - Scripts racine : `dev`, `build`, `lint`, `format`, `format:check`, `typecheck`, `test`, `test:int`, `test:isolation` (vide pour l'instant, sort en succès avec 0 test), `test:e2e`, `test:cov`, `db:migrate`, `db:reset`, `db:seed`.
-- Tests : Vitest (API avec SWC, web avec jsdom), Testcontainers PostgreSQL (helper partagé qui applique les migrations), Playwright installé avec un test de fumée (page d'accueil affiche « API OK »).
+- Tests : Vitest (API avec SWC, web avec happy-dom), Testcontainers PostgreSQL (helper partagé qui applique les migrations), Playwright installé avec un test de fumée (page d'accueil affiche « API OK »).
 - **Tests d'architecture** (dependency-cruiser + règles ESLint) :
   - `apps/web` n'importe jamais `apps/api` ; les deux peuvent importer `packages/*` ;
   - dans un module API, `domain/` n'importe ni NestJS, ni Prisma, ni `infrastructure/` ;

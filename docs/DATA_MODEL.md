@@ -39,7 +39,7 @@
 - **Objets SQL créés en PHASE-00** (même migration) :
   - `public.f_unaccent(text) RETURNS text IMMUTABLE PARALLEL SAFE` : enveloppe de `unaccent('public.unaccent', $1)`, nécessaire aux index d'expression.
   - Configuration plein texte `public.orbit_search` : copie de `simple`, avec `unaccent` en tête des dictionnaires (`ALTER MAPPING FOR hword, hword_part, word WITH unaccent, simple`). Choix de `simple` plutôt que `french` : noms propres, wolof et termes mixtes sans racinisation erronée.
-  - Rôles : `orbit_migrator` (propriétaire du schéma, exécute les migrations), `orbit_app` (rôle de l'API et du worker), `orbit_maintenance` (purges de rétention, suppression de compte). Voir §1.10.
+  - Rôles : `orbit_owner` (propriétaire du schéma, exécute les migrations), `orbit_app` (rôle de l'API et du worker), `orbit_maintenance` (purges de rétention, suppression de compte). Voir §1.10.
 
 ### 1.2 Nommage
 
@@ -167,7 +167,7 @@ Partout ailleurs : colonnes relationnelles.
 
 | Rôle | Droits |
 |---|---|
-| `orbit_migrator` | Propriétaire de toutes les tables. Utilisé uniquement par `prisma migrate deploy`. |
+| `orbit_owner` | Propriétaire de toutes les tables. Utilisé uniquement par `prisma migrate deploy`. |
 | `orbit_app` | `SELECT, INSERT, UPDATE, DELETE` sur les tables métier ; **`SELECT, INSERT` seulement** sur `audit_logs` et `login_events` (append-only) ; `EXECUTE` sur les fonctions de déclencheur. Aucun `TRUNCATE`, aucun DDL. |
 | `orbit_maintenance` | Utilisé par les jobs de purge (rétention, suppression de compte). `DELETE` sur `audit_logs`/`login_events` limité aux lignes hors rétention ou appartenant à un compte supprimé, via les fonctions `SECURITY DEFINER` `orbit_purge_expired_logs()` et `orbit_purge_user(uuid)`. |
 
@@ -247,7 +247,7 @@ Garde-fous :
 - Ajout d'une colonne `NOT NULL` sur une table peuplée : ajouter nullable → remplir → `SET NOT NULL`.
 - Index sur une grosse table en production : `CREATE INDEX CONCURRENTLY`, seul dans sa migration.
 - **Mise à jour d'un `CHECK num_nonnulls(...)`** quand une phase ajoute une cible de lien (`note_links`, `document_links`, `reminders`, `goal_links`) : `DROP CONSTRAINT ck_<t>__one_target` puis `ADD CONSTRAINT ck_<t>__one_target CHECK (num_nonnulls(<nouvelle liste>) = 1)`, dans la même migration que l'ajout de colonne, avec l'index unique partiel de la nouvelle cible.
-- Déploiement : `prisma migrate deploy` par `orbit_migrator`, **avant** le démarrage de la nouvelle version de l'API (INFRASTRUCTURE.md). Sauvegarde vérifiée avant toute migration de production.
+- Déploiement : `prisma migrate deploy` par `orbit_owner`, **avant** le démarrage de la nouvelle version de l'API (INFRASTRUCTURE.md). Sauvegarde vérifiée avant toute migration de production.
 
 ### 2.4 Seeds
 

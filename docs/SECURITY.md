@@ -554,7 +554,7 @@ Conséquences dans ORBIT :
 ### 15.3 PostgreSQL
 
 - Version majeure supportée ; `listen_addresses` sur le réseau interne ; `password_encryption = scram-sha-256` ; `pg_hba.conf` limité au sous-réseau Docker.
-- Rôles : `orbit_migrator` (DDL, utilisé seulement par le job de migration), `orbit_app` (DML sur les tables métier, aucun DDL, pas de `SUPERUSER`, pas de `CREATEROLE`), `orbit_backup` (lecture pour `pg_dump`).
+- Rôles : `orbit_owner` (DDL, utilisé seulement par le job de migration), `orbit_app` (DML sur les tables métier, aucun DDL, pas de `SUPERUSER`, pas de `CREATEROLE`), `orbit_backup` (lecture pour `pg_dump`).
 - `audit_logs` : `REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM orbit_app` + trigger qui lève une exception sur `UPDATE`/`DELETE` (§18). La purge de rétention s'exécute avec un rôle de maintenance.
 - `statement_timeout = 15s` pour `orbit_app` ; `log_min_duration_statement` sans paramètres (`log_parameter_max_length = 0`) pour ne pas journaliser de données.
 

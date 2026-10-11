@@ -43,7 +43,7 @@ Règles :
 | Besoin | Outil | Remarque |
 |---|---|---|
 | Exécuteur API | **Vitest + SWC** (`unplugin-swc`) | SWC émet les métadonnées de décorateurs requises par l'injection de dépendances NestJS. |
-| Exécuteur web | **Vitest + Testing Library** (`@testing-library/react`, `user-event`, `jest-dom`) | Environnement `jsdom`. |
+| Exécuteur web | **Vitest + Testing Library** (`@testing-library/react`, `user-event`, `jest-dom`) | Environnement `happy-dom` (jsdom est écarté : il remplace AbortSignal de façon incompatible avec le fetch de Node). |
 | Base de données | **Testcontainers PostgreSQL** | Même version majeure que la production (version épinglée dans `INFRASTRUCTURE.md`). Redis via Testcontainers à partir de PHASE-08. |
 | HTTP API | `supertest` sur l'application Nest démarrée | Le test exerce les guards, pipes et filtres réels. |
 | E2E | **Playwright** | Chromium bureau, Chromium mobile (viewport téléphone), WebKit mobile en smoke. |
@@ -74,7 +74,7 @@ Règles :
 - Les tests figent l'horloge ; les tests de propriétés injectent des dates générées.
 
 **Vitest (web).**
-- `environment: 'jsdom'`, `setupFiles` : `jest-dom`, serveur MSW avec `onUnhandledRequest: 'error'`, `cleanup` après chaque test.
+- `environment: 'happy-dom'`, `setupFiles` : `jest-dom`, serveur MSW avec `onUnhandledRequest: 'error'`, `cleanup` après chaque test.
 - Requêtes par rôle d'abord (`getByRole`), puis libellé ; `data-testid` en dernier recours.
 - Aucun montant manipulé en `number` dans les tests de formulaires ; le formatage vient de `packages/money`.
 
