@@ -1,0 +1,15 @@
+// Schema de donnees ORBIT (DATA_MODEL.md). Conventions : modeles PascalCase singuliers,
+// tables snake_case au pluriel via @@map, colonnes snake_case via @map (CODING_STANDARDS 3.2).
+// Aucune table metier en PHASE-00 : uniquement les extensions PostgreSQL.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DATABASE_MIGRATION_URL")
+  extensions = [citext, unaccent, pg_trgm]
+}
