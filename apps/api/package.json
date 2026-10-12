@@ -29,7 +29,6 @@
     "@orbit/contracts": "workspace:*",
     "@orbit/money": "workspace:*",
     "@prisma/client": "6.19.3",
-    "argon2": "0.45.1",
     "helmet": "8.3.0",
     "nestjs-cls": "6.3.1",
     "nestjs-pino": "4.6.1",
