@@ -321,6 +321,13 @@ Si l'ouverture publique (ADR-026) intervient avant PHASE-17 :
 - la durée maximale d'une réécriture externe sur Vercel. Les exports et les appels IA longs doivent rester sous cette limite, ou passer par un job et un lien de téléchargement ;
 - la transmission de `Set-Cookie` à travers la réécriture.
 
+### ADR-039 : argon2id via `node:crypto` plutôt que le paquet natif `argon2` (précise ADR-006)
+
+- **Date :** 12 octobre 2026, PHASE-01 T2.
+- **Contexte :** le contrôle d'application de Windows (Smart App Control) bloque le module natif non signé du paquet `argon2` sur le poste de développement, qui sert aussi de runner CI auto-hébergé. On ne modifie pas ce réglage de sécurité.
+- **Décision :** le hachage utilise `crypto.argon2` de Node (OpenSSL, disponible depuis Node 24.7, exécuté dans le pool de threads libuv). Le format PHC (`$argon2id$v=19$m=…,t=…,p=…$sel$empreinte`) est écrit et lu par `apps/api/src/platform/auth/argon2-phc.ts`. Il est compatible avec les bibliothèques argon2 usuelles et ses coûts sont bornés à la lecture. `engines.node` passe à `>=24.7.0`.
+- **Conséquences :** il n'y a plus aucun module natif tiers ni script d'installation pour le hachage, et le comportement est identique sous Windows et sur le VPS Linux. Les paramètres d'ADR-006 et la sémaphore de SECURITY.md §3.3 sont inchangés.
+
 ---
 
 ## Décisions ouvertes (à trancher au plus tard au démarrage de la phase indiquée)

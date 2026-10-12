@@ -593,7 +593,7 @@ Conséquences dans ORBIT :
 ### 17.1 Dépendances
 
 - `pnpm-lock.yaml` versionné ; CI en `pnpm install --frozen-lockfile`.
-- Scripts d'installation bloqués par défaut (pnpm 10) ; liste blanche explicite `onlyBuiltDependencies` (par exemple `argon2`, `prisma`, `@swc/core`, `esbuild`, `sodium-native`).
+- Scripts d'installation bloqués par défaut (pnpm 10) ; liste blanche explicite `allowBuilds` dans `pnpm-workspace.yaml` (par exemple `prisma`, `@swc/core`, `esbuild`). argon2id passe par `node:crypto` et n'exige aucun module natif (ADR-039).
 - Délai de maturité : Renovate `minimumReleaseAge: "7 days"` (et `minimumReleaseAge` de pnpm si disponible dans la version utilisée).
 - `pnpm audit --audit-level=high` bloquant en CI ; exception seulement avec justification datée dans le rapport de phase.
 - Nouvelle dépendance : justification dans la PR (besoin, popularité, mainteneurs, licence, alternative native). Pas de dépendance pour moins de 50 lignes de code évidentes.

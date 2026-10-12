@@ -194,7 +194,7 @@ Les scripts sont écrits en Node ou en commandes `pnpm`, pas en Bash, pour fonct
 
 ### 4.2 `apps/api/Dockerfile` (cibles `api` et `worker`)
 
-Base Debian slim plutôt qu'Alpine : moteurs Prisma et modules natifs (argon2, libsodium) plus fiables sur glibc.
+Base Debian slim plutôt qu'Alpine : moteurs Prisma et modules natifs éventuels (libsodium) plus fiables sur glibc. argon2id vient de `node:crypto` (ADR-039) ; l'image doit embarquer Node ≥ 24.7.
 
 ```dockerfile
 # syntax=docker/dockerfile:1.7
