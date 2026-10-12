@@ -1,6 +1,7 @@
 // Schema de donnees ORBIT (DATA_MODEL.md). Conventions : modeles PascalCase singuliers,
 // tables snake_case au pluriel via @@map, colonnes snake_case via @map (CODING_STANDARDS 3.2).
-// Aucune table metier en PHASE-00 : uniquement les extensions PostgreSQL.
+// Les objets que Prisma ne sait pas exprimer (CHECK, index partiels, declencheurs, droits)
+// sont ecrits a la main dans les migrations et listes dans prisma/manual-objects.md.
 
 generator client {
   provider        = "prisma-client-js"
@@ -12,4 +13,223 @@ datasource db {
   url        = env("DATABASE_URL")
   directUrl  = env("DATABASE_MIGRATION_URL")
   extensions = [citext, unaccent, pg_trgm]
+}
+
+// ============================================================================
+// M01 - Identite, sessions, preferences, audit (PHASE-01, DATA_MODEL.md M01)
+// ============================================================================
+
+enum UserRole {
+  USER
+  ADMIN
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_DELETION
+
+  @@map("user_status")
+}
+
+enum SessionRevokeReason {
+  LOGOUT
+  LOGOUT_ALL
+  PASSWORD_CHANGED
+  EMAIL_CHANGED
+  ADMIN_ACTION
+  ACCOUNT_DELETION
+  SECURITY
+  LIMIT
+
+  @@map("session_revoke_reason")
+}
+
+enum EmailTokenPurpose {
+  VERIFY_SIGNUP
+  CHANGE_EMAIL
+
+  @@map("email_token_purpose")
+}
+
+enum LoginEventType {
+  LOGIN_SUCCEEDED
+  LOGIN_FAILED
+  LOGOUT
+  SESSION_REVOKED
+  PASSWORD_CHANGED
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  EMAIL_VERIFIED
+  EMAIL_CHANGED
+  REAUTH_SUCCEEDED
+  REAUTH_FAILED
+  ACCOUNT_LOCKED
+  MFA_SUCCEEDED
+  MFA_FAILED
+
+  @@map("login_event_type")
+}
+
+enum AuditActorType {
+  USER
+  ADMIN
+  SYSTEM
+  AUTOMATION
+  AI
+  API_KEY
+  INTEGRATION
+
+  @@map("audit_actor_type")
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+  DENIED
+
+  @@map("audit_outcome")
+}
+
+enum UiTheme {
+  SYSTEM
+  LIGHT
+  DARK
+
+  @@map("ui_theme")
+}
+
+model User {
+  id                String     @id @db.Uuid
+  email             String     @unique @db.Citext
+  passwordHash      String     @map("password_hash") @db.VarChar(255)
+  displayName       String     @map("display_name") @db.VarChar(80)
+  firstName         String?    @map("first_name") @db.VarChar(80)
+  lastName          String?    @map("last_name") @db.VarChar(80)
+  role              UserRole   @default(USER)
+  status            UserStatus @default(ACTIVE)
+  emailVerifiedAt   DateTime?  @map("email_verified_at") @db.Timestamptz(6)
+  passwordChangedAt DateTime   @default(now()) @map("password_changed_at") @db.Timestamptz(6)
+  failedLoginCount  Int        @default(0) @map("failed_login_count")
+  lockedUntil       DateTime?  @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt       DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sessions                Session[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  preferences             UserPreference?
+
+  @@index([status, createdAt], map: "ix_users__status_created")
+  @@map("users")
+}
+
+model Session {
+  id                String               @id @db.Uuid
+  userId            String               @map("user_id") @db.Uuid
+  tokenHash         Bytes                @unique @map("token_hash")
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt        DateTime             @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  idleExpiresAt     DateTime             @map("idle_expires_at") @db.Timestamptz(6)
+  absoluteExpiresAt DateTime             @map("absolute_expires_at") @db.Timestamptz(6)
+  reauthAt          DateTime?            @map("reauth_at") @db.Timestamptz(6)
+  revokedAt         DateTime?            @map("revoked_at") @db.Timestamptz(6)
+  revokeReason      SessionRevokeReason? @map("revoke_reason")
+  ip                String?              @db.Inet
+  userAgentLabel    String?              @map("user_agent_label") @db.VarChar(200)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([absoluteExpiresAt], map: "ix_sessions__absolute_expires")
+  @@map("sessions")
+}
+
+model EmailVerificationToken {
+  id          String            @id @db.Uuid
+  userId      String            @map("user_id") @db.Uuid
+  tokenHash   Bytes             @unique @map("token_hash")
+  purpose     EmailTokenPurpose
+  targetEmail String            @map("target_email") @db.Citext
+  expiresAt   DateTime          @map("expires_at") @db.Timestamptz(6)
+  consumedAt  DateTime?         @map("consumed_at") @db.Timestamptz(6)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt], map: "ix_email_verification_tokens__expires")
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id          String    @id @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  tokenHash   Bytes     @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt  DateTime? @map("consumed_at") @db.Timestamptz(6)
+  requestedIp String?   @map("requested_ip") @db.Inet
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt], map: "ix_password_reset_tokens__expires")
+  @@map("password_reset_tokens")
+}
+
+model UserPreference {
+  userId                String    @id @map("user_id") @db.Uuid
+  locale                String    @default("fr") @db.VarChar(10)
+  timezone              String    @default("Africa/Dakar") @db.VarChar(64)
+  defaultCurrency       String    @default("XOF") @map("default_currency") @db.Char(3)
+  dateFormat            String    @default("dd/MM/yyyy") @map("date_format") @db.VarChar(20)
+  weekStartsOn          Int       @default(1) @map("week_starts_on") @db.SmallInt
+  theme                 UiTheme   @default(SYSTEM)
+  enabledModules        String[]  @map("enabled_modules")
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+/// Journal de connexion en ajout seul, sans FK (DATA_MODEL.md M01).
+model LoginEvent {
+  id             String         @id @db.Uuid
+  userId         String?        @map("user_id") @db.Uuid
+  emailHmac      Bytes?         @map("email_hmac")
+  eventType      LoginEventType @map("event_type")
+  failureCode    String?        @map("failure_code") @db.VarChar(40)
+  sessionId      String?        @map("session_id") @db.Uuid
+  ip             String?        @db.Inet
+  userAgentLabel String?        @map("user_agent_label") @db.VarChar(200)
+  occurredAt     DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([userId, occurredAt(sort: Desc)], map: "ix_login_events__user_time")
+  @@map("login_events")
+}
+
+/// Journal d audit en ajout seul, sans FK (DATA_MODEL.md M01, ADR-029).
+model AuditLog {
+  id            String         @id @db.Uuid
+  userId        String?        @map("user_id") @db.Uuid
+  actorType     AuditActorType @map("actor_type")
+  actorUserId   String?        @map("actor_user_id") @db.Uuid
+  action        String         @db.VarChar(80)
+  entityType    String?        @map("entity_type") @db.VarChar(60)
+  entityId      String?        @map("entity_id") @db.Uuid
+  outcome       AuditOutcome   @default(SUCCESS)
+  requestId     String?        @map("request_id") @db.VarChar(64)
+  correlationId String?        @map("correlation_id") @db.VarChar(64)
+  ip            String?        @db.Inet
+  metadata      Json           @default("{}")
+  occurredAt    DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([userId, occurredAt(sort: Desc)], map: "ix_audit_logs__user_time")
+  @@index([userId, entityType, entityId, occurredAt(sort: Desc)], map: "ix_audit_logs__entity")
+  @@map("audit_logs")
 }
