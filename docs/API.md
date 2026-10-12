@@ -343,7 +343,7 @@ Seules ces routes portent `@Public()` ; le test de CI vérifie que la liste du c
 
 | Méthode | Route | Rôle | Idem. | Description |
 |---|---|---|---|---|
-| `POST` | `/auth/register` | Public | — | Inscription `{ email, password, displayName? }` → `202` uniforme (`SECURITY.md` §3.4). |
+| `POST` | `/auth/register` | Public | — | Inscription `{ email, password, displayName? }` → `202` uniforme `{ "data": { "status": "accepted" } }` (`SECURITY.md` §3.4). Mot de passe hors politique → `400 VALIDATION_FAILED`, `details[].path = ["password"]`. |
 | `POST` | `/auth/email/verify` | Public | Nat. | Consomme `{ token }` ; `200` ou `410 GONE`. |
 | `POST` | `/auth/email/verify/resend` | Public | — | `{ email }` → `202` uniforme. |
 | `POST` | `/auth/login` | Public | — | `{ email, password }` → `200 { data: { user, mfaRequired } }` + cookie. |

@@ -422,12 +422,15 @@ Légende : **O** = obligatoire, **C** = conditionnel, **F** = facultatif. **S** 
 | `SIGNED_URL_TTL_SECONDS` | Durée des URL signées (≤ 300, ADR-013) | `300` | F (`300`) | 00 |
 | `UPLOAD_MAX_BYTES` | Taille max d'un fichier | `20971520` | F | 09 |
 | `MAIL_DRIVER` | `smtp` (Mailpit), `brevo` ou `resend` | `smtp` | O | 01 |
-| `SMTP_HOST` / `SMTP_PORT` | Mailpit en local | `localhost` / `1025` | C (`smtp`) | 01 |
+| `SMTP_HOST` / `SMTP_PORT` | Mailpit en local ; une IP plutôt que `localhost` (nodemailer résout lui-même le nom) | `127.0.0.1` / `1025` | C (`smtp`) | 01 |
 | `MAIL_API_KEY` **S** | Clé du fournisseur transactionnel | `fake-mail-key` | C (`brevo`, `resend`) | 03 |
 | `MAIL_FROM` | Expéditeur | `ORBIT <no-reply@orbit.example.com>` | O | 01 |
 | `MAIL_ALLOWLIST` | Domaines autorisés en staging | `example.com` | C (`staging`) | 03 |
 | `ARGON2_MEMORY_KIB` | Paramètre argon2id (ADR-006) | `65536` | F | 01 |
-| `ARGON2_ITERATIONS` | Paramètre argon2id | `3` | F | 01 |
+| `ARGON2_ITERATIONS` | Paramètre argon2id ; en déploiement, `ARGON2_MEMORY_KIB` ≥ 19456 (refus au démarrage sinon) | `3` | F | 01 |
+| `REGISTRATION_MODE` | `closed`, `allowlist` ou `open` (ADR-026) | `allowlist` | F (`allowlist`) | 01 |
+| `REGISTRATION_ALLOWLIST` | Adresses autorisées en mode `allowlist`, séparées par des virgules | `abdou@example.com` | C (`allowlist`) | 01 |
+| `AUTH_UNIFORM_RESPONSE_MS` | Durée plancher (ms) des réponses d'inscription et de renvoi, pour ne pas révéler l'existence d'un compte ; > 0 en déploiement | `750` | F (`750`) | 01 |
 | `SESSION_IDLE_DAYS` / `SESSION_ABSOLUTE_DAYS` | Expirations de session | `7` / `30` | F | 01 |
 | `RATE_LIMIT_STORE` | `memory` puis `redis` | `memory` | F | 01 |
 | `SENTRY_DSN` | DSN du projet Sentry SaaS « api » (région UE) ; non secret, mais propre à chaque environnement | `https://key@o0.ingest.de.sentry.io/1` | C (staging, prod) | 03 |

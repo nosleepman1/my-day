@@ -5,6 +5,7 @@ import { z } from 'zod';
 /** Secrets qui, hors `local` et `test`, doivent venir d'un fichier monté `<NOM>_FILE` (INFRASTRUCTURE.md §7). */
 const SECRET_KEYS = ['DATABASE_URL'] as const;
 const DEPLOYED_ENVS: ReadonlySet<string> = new Set(['staging', 'production']);
+const MIN_DEPLOYED_ARGON2_MEMORY_KIB = 19_456;
 
 type IssueContext = z.core.$RefinementCtx;
 
@@ -22,6 +23,38 @@ function checkAppOrigin(appOrigin: string, appEnv: string, ctx: IssueContext): v
   const isSecureEnough = url.protocol === 'https:' || !DEPLOYED_ENVS.has(appEnv);
   if (!isOriginOnly || !isSecureEnough) {
     ctx.addIssue({ code: 'custom', path: ['APP_ORIGIN'], message: 'must be an https origin without path' });
+  }
+}
+
+/** Liste « a@x, b@y » → adresses normalisées (trim, NFC, minuscules), sans entrée vide. */
+function splitAddressList(list: string): string[] {
+  return list
+    .split(',')
+    .map((address) => address.trim().normalize('NFC').toLowerCase())
+    .filter((address) => address.length > 0);
+}
+
+/** En déploiement : argon2id au moins au plancher OWASP (19 Mio) et réponses uniformes actives. */
+function checkDeployedAuthCosts(
+  memoryKib: number,
+  uniformMs: number,
+  appEnv: string,
+  ctx: IssueContext,
+): void {
+  if (!DEPLOYED_ENVS.has(appEnv)) return;
+  if (memoryKib < MIN_DEPLOYED_ARGON2_MEMORY_KIB) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['ARGON2_MEMORY_KIB'],
+      message: 'too low for a deployed environment',
+    });
+  }
+  if (uniformMs === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['AUTH_UNIFORM_RESPONSE_MS'],
+      message: 'must be positive once deployed',
+    });
   }
 }
 
@@ -46,10 +79,20 @@ export const EnvSchema = z
       .string()
       .min(3)
       .regex(/^[^\r\n]+$/, 'must be a single line'),
+    /** ADR-026 : `allowlist` (sur invitation) par défaut jusqu'à la fin de PHASE-08. */
+    REGISTRATION_MODE: z.enum(['closed', 'allowlist', 'open']).default('allowlist'),
+    /** Adresses autorisées en mode `allowlist`, séparées par des virgules, normalisées comme `users.email`. */
+    REGISTRATION_ALLOWLIST: z.string().default('').transform(splitAddressList).pipe(z.array(z.email())),
+    /** ADR-006, ADR-039 : 64 Mio et 3 passes ; des valeurs basses ne sont admises que hors déploiement. */
+    ARGON2_MEMORY_KIB: z.coerce.number().int().min(1_024).max(1_048_576).default(65_536),
+    ARGON2_ITERATIONS: z.coerce.number().int().min(1).max(10).default(3),
+    /** Durée plancher des réponses uniformes d'inscription et de renvoi (SECURITY.md §3.8). */
+    AUTH_UNIFORM_RESPONSE_MS: z.coerce.number().int().min(0).max(5_000).default(750),
   })
   .superRefine((env, ctx) => {
     checkEnvironmentPair(env.NODE_ENV, env.APP_ENV, ctx);
     checkAppOrigin(env.APP_ORIGIN, env.APP_ENV, ctx);
+    checkDeployedAuthCosts(env.ARGON2_MEMORY_KIB, env.AUTH_UNIFORM_RESPONSE_MS, env.APP_ENV, ctx);
     if (env.LOG_LEVEL === 'trace' && DEPLOYED_ENVS.has(env.APP_ENV)) {
       ctx.addIssue({
         code: 'custom',

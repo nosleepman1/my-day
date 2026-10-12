@@ -115,6 +115,49 @@ describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
     expect(() => loadEnv({ ...VALID, SMTP_PORT: '70000' }, noSecretFile)).toThrow(/SMTP_PORT/);
   });
 
+  it('defaults registration to the allowlist mode with production hashing costs (ADR-026, ADR-006)', () => {
+    const env = loadEnv(VALID, noSecretFile);
+    expect(env.REGISTRATION_MODE).toBe('allowlist');
+    expect(env.REGISTRATION_ALLOWLIST).toEqual([]);
+    expect(env.ARGON2_MEMORY_KIB).toBe(65_536);
+    expect(env.ARGON2_ITERATIONS).toBe(3);
+    expect(env.AUTH_UNIFORM_RESPONSE_MS).toBe(750);
+  });
+
+  it('normalises the allowlist and rejects an invalid address in it', () => {
+    const env = loadEnv(
+      { ...VALID, REGISTRATION_ALLOWLIST: ' Abdou@Example.TEST, ,aminata@example.test ' },
+      noSecretFile,
+    );
+    expect(env.REGISTRATION_ALLOWLIST).toEqual(['abdou@example.test', 'aminata@example.test']);
+    expect(() => loadEnv({ ...VALID, REGISTRATION_ALLOWLIST: 'not-an-email' }, noSecretFile)).toThrow(
+      /REGISTRATION_ALLOWLIST/,
+    );
+    expect(() => loadEnv({ ...VALID, REGISTRATION_MODE: 'public' }, noSecretFile)).toThrow(
+      /REGISTRATION_MODE/,
+    );
+  });
+
+  it('refuses test-only hashing costs and a disabled response floor once deployed', () => {
+    const { DATABASE_URL: _plain, ...rest } = VALID;
+    const deployed = {
+      ...rest,
+      NODE_ENV: 'production',
+      APP_ENV: 'production',
+      APP_ORIGIN: 'https://orbit.example.com',
+      DATABASE_URL_FILE: '/run/secrets/database_url',
+    };
+    const readDatabaseUrl = (): string => VALID.DATABASE_URL;
+
+    expect(() => loadEnv(deployed, readDatabaseUrl)).not.toThrow();
+    expect(() => loadEnv({ ...deployed, ARGON2_MEMORY_KIB: '1024' }, readDatabaseUrl)).toThrow(
+      /ARGON2_MEMORY_KIB/,
+    );
+    expect(() => loadEnv({ ...deployed, AUTH_UNIFORM_RESPONSE_MS: '0' }, readDatabaseUrl)).toThrow(
+      /AUTH_UNIFORM_RESPONSE_MS/,
+    );
+  });
+
   it('reports an unreadable secret file without leaking its content', () => {
     const { DATABASE_URL: _plain, ...rest } = VALID;
     expect(() =>

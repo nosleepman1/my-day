@@ -1,4 +1,4 @@
-import type { ErrorCode } from '@orbit/contracts';
+import type { ErrorCode, FieldIssue } from '@orbit/contracts';
 
 export type ErrorDetails = Readonly<Record<string, unknown>>;
 
@@ -12,7 +12,7 @@ export class DomainError extends Error {
   constructor(
     readonly code: ErrorCode,
     message: string,
-    readonly details?: ErrorDetails,
+    readonly details?: ErrorDetails | readonly FieldIssue[],
   ) {
     super(message);
   }
