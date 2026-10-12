@@ -1,3 +1,4 @@
+export * from './auth/email-verification.schema';
 export * from './auth/registration.schema';
 export * from './common/amount';
 export * from './common/dates';

@@ -54,4 +54,13 @@ export class UsersRepository {
       throw error;
     }
   }
+
+  /** `false` si le compte n'a plus cette adresse ou si elle est déjà vérifiée. */
+  async markEmailVerified(userId: string, email: string, at: Date): Promise<boolean> {
+    const { count } = await this.prisma.user.updateMany({
+      where: { id: userId, email, emailVerifiedAt: null },
+      data: { emailVerifiedAt: at },
+    });
+    return count === 1;
+  }
 }

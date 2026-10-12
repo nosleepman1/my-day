@@ -8,8 +8,13 @@ export interface AccountDirectory {
   createAccount(input: CreateAccountInput): Promise<AccountSummary | null>;
 }
 
+/** Marquage de l'adresse vérifiée, utilisé par la vérification d'e-mail de `modules/auth`. */
+export interface EmailVerificationTarget {
+  markEmailVerified(userId: string, email: string, at: Date): Promise<boolean>;
+}
+
 @Injectable()
-export class UsersService implements AccountDirectory {
+export class UsersService implements AccountDirectory, EmailVerificationTarget {
   constructor(private readonly users: UsersRepository) {}
 
   /** L'adresse doit déjà être normalisée par l'appelant. */
@@ -20,5 +25,10 @@ export class UsersService implements AccountDirectory {
   /** Utilisateur et préférences par défaut (fuseau Africa/Dakar, XOF, fr, tous les modules utilisateur). */
   createAccount(input: CreateAccountInput): Promise<AccountSummary | null> {
     return this.users.createWithDefaultPreferences(input);
+  }
+
+  /** Seulement si le compte a toujours cette adresse et qu'elle n'est pas déjà vérifiée. */
+  markEmailVerified(userId: string, email: string, at: Date): Promise<boolean> {
+    return this.users.markEmailVerified(userId, email, at);
   }
 }

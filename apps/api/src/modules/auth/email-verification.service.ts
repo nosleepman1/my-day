@@ -14,7 +14,7 @@ import {
 export const EMAIL_VERIFICATION_TTL_HOURS = 24;
 const HOUR_MS = 3_600_000;
 
-/** Vérification de l'adresse e-mail : émission du jeton et e-mails associés (T4), consommation (T5). */
+/** Émission du jeton de vérification d'adresse et e-mails associés ; la consommation est dans `EmailConfirmationService`. */
 @Injectable()
 export class EmailVerificationService {
   constructor(
