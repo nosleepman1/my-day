@@ -7,6 +7,7 @@ const VALID = {
   APP_ENV: 'test',
   APP_ORIGIN: 'http://localhost:5173',
   DATABASE_URL: 'postgresql://orbit_app:fake-password@localhost:5432/orbit',
+  MAIL_FROM: 'ORBIT <no-reply@orbit.localhost>',
 } as const;
 
 const noSecretFile = (): string => {
@@ -91,6 +92,27 @@ describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
         () => VALID.DATABASE_URL,
       ),
     ).toThrow(/APP_ORIGIN/);
+  });
+
+  it('defaults the mail transport to the local Mailpit SMTP server', () => {
+    const env = loadEnv(VALID, noSecretFile);
+    expect(env.MAIL_DRIVER).toBe('smtp');
+    expect(env.SMTP_HOST).toBe('127.0.0.1');
+    expect(env.SMTP_PORT).toBe(1025);
+    expect(env.MAIL_FROM).toBe(VALID.MAIL_FROM);
+  });
+
+  it('requires MAIL_FROM and refuses line breaks in it (header injection)', () => {
+    const { MAIL_FROM: _omitted, ...withoutFrom } = VALID;
+    expect(() => loadEnv(withoutFrom, noSecretFile)).toThrow(/MAIL_FROM/);
+    expect(() => loadEnv({ ...VALID, MAIL_FROM: 'ORBIT <a@b.test>\r\nBcc: x@y.test' }, noSecretFile)).toThrow(
+      /MAIL_FROM/,
+    );
+  });
+
+  it('refuses an unknown mail driver and an invalid SMTP port', () => {
+    expect(() => loadEnv({ ...VALID, MAIL_DRIVER: 'sendmail' }, noSecretFile)).toThrow(/MAIL_DRIVER/);
+    expect(() => loadEnv({ ...VALID, SMTP_PORT: '70000' }, noSecretFile)).toThrow(/SMTP_PORT/);
   });
 
   it('reports an unreadable secret file without leaking its content', () => {

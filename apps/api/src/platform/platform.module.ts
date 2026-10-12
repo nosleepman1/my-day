@@ -6,6 +6,7 @@ import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { GlobalExceptionFilter } from './http/global-exception.filter';
 import { IdsModule } from './ids/ids.module';
+import { MailModule } from './mail/mail.module';
 import { HealthController } from './observability/health.controller';
 import { ObservabilityModule } from './observability/observability.module';
 
@@ -14,7 +15,7 @@ import { ObservabilityModule } from './observability/observability.module';
  * validation Zod des entrées, filtrage Zod des réponses et format d'erreur unique.
  */
 @Module({
-  imports: [ConfigModule, ObservabilityModule, DatabaseModule, IdsModule],
+  imports: [ConfigModule, ObservabilityModule, DatabaseModule, IdsModule, MailModule],
   controllers: [HealthController],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

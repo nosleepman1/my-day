@@ -14,6 +14,7 @@ const TEST_ENV = {
   APP_ENV: 'test',
   APP_ORIGIN: 'http://localhost:5173',
   LOG_LEVEL: 'silent',
+  MAIL_FROM: 'ORBIT <no-reply@orbit.localhost>',
 } as const;
 
 /**

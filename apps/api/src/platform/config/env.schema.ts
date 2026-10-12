@@ -36,6 +36,16 @@ export const EnvSchema = z
     DATABASE_URL: z.string().regex(/^postgres(?:ql)?:\/\//, 'must be a PostgreSQL connection URL'),
     /** Nombre de proxys de confiance devant l'API (Caddy, réécriture Vercel). */
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+    /** PHASE-01 : SMTP uniquement (Mailpit en local et en test) ; `brevo`/`resend` en PHASE-03. */
+    MAIL_DRIVER: z.enum(['smtp']).default('smtp'),
+    /** IP plutôt que `localhost` : nodemailer résout lui-même le nom, ce qui expire parfois sous Windows. */
+    SMTP_HOST: z.string().min(1).default('127.0.0.1'),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(1025),
+    /** Expéditeur, par exemple `ORBIT <no-reply@orbit.example.com>` ; une seule ligne (aucune injection d'en-tête). */
+    MAIL_FROM: z
+      .string()
+      .min(3)
+      .regex(/^[^\r\n]+$/, 'must be a single line'),
   })
   .superRefine((env, ctx) => {
     checkEnvironmentPair(env.NODE_ENV, env.APP_ENV, ctx);
