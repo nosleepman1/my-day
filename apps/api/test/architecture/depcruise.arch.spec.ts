@@ -18,6 +18,7 @@ const EXPECTED_RULES = [
   'no-circular',
   'packages-not-to-apps',
   'shared-packages-framework-free',
+  'vendor-sdk-only-in-adapter',
   'web-not-to-api',
 ];
 
@@ -26,7 +27,7 @@ async function violatedRules(): Promise<string[]> {
     ...config.options,
     validate: true,
     ruleSet: { forbidden: config.forbidden ?? [] },
-    exclude: { path: '(^|/)dist/' },
+    exclude: { path: '^(apps|packages)/[^/]+/dist/' },
   });
   const output: ICruiseResult =
     typeof result.output === 'string' ? (JSON.parse(result.output) as ICruiseResult) : result.output;

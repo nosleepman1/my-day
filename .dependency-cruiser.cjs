@@ -65,6 +65,13 @@ module.exports = {
       to: { path: '(^|/)apps/api/src/platform/', pathNot: '(^|/)apps/api/src/platform/errors/' },
     },
     {
+      name: 'vendor-sdk-only-in-adapter',
+      severity: 'error',
+      comment: 'nodemailer n est importe que par son adaptateur du port MAIL (DESIGN_PATTERNS.md 2).',
+      from: { path: '(^|/)apps/api/', pathNot: '(^|/)apps/api/src/platform/mail/smtp-mail[.]adapter[.]ts$' },
+      to: { path: 'node_modules/nodemailer/' },
+    },
+    {
       name: 'modules-through-public-api',
       severity: 'error',
       comment: 'Un module n importe un autre module que par son index.ts (ARCHITECTURE.md 5.2).',
@@ -77,7 +84,8 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
-    exclude: { path: '(^|/)(dist|coverage|__fixtures__)/' },
+    // Ancré sur le dépôt : un paquet npm publié dans dist/ (nodemailer…) doit rester visible des règles.
+    exclude: { path: '^(apps|packages)/[^/]+/(dist|coverage)/|(^|/)__fixtures__/' },
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     enhancedResolveOptions: {
