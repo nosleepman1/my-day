@@ -27,7 +27,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
   }
 
+  /** Une base injoignable ne doit pas faire échouer l'arrêt : `$disconnect` rejette si une connexion échoue en cours. */
   async onModuleDestroy(): Promise<void> {
-    await this.$disconnect();
+    try {
+      await this.$disconnect();
+    } catch (error: unknown) {
+      this.logger.warn({ err: error }, 'database.disconnect_failed');
+    }
   }
 }
