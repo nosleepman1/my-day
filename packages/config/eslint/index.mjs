@@ -148,6 +148,25 @@ export function orbitEslint({ rootDir }) {
       files: API_MONEY_STRICT_FILES,
       rules: { 'no-restricted-syntax': syntaxFor(BASE, RAW_SQL, MONEY_STRICT, API_MODULES) },
     },
+    // Client Prisma brut réservé à la plateforme et aux modules auth, users, admin (ADR-007-3).
+    {
+      files: ['apps/api/src/modules/**'],
+      ignores: ['apps/api/src/modules/{auth,users,admin}/**'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            paths: BANNED_EVERYWHERE,
+            patterns: [
+              {
+                group: ['**/platform/database/prisma.service'],
+                message: 'Client Prisma brut interdit ici : injecter TENANT_PRISMA (ADR-007-3).',
+              },
+            ],
+          },
+        ],
+      },
+    },
     // Seul dossier autorisé pour le SQL brut (ADR-028), plus les tests de l'API (sondes de privilèges, fixtures).
     {
       files: ['apps/api/src/platform/database/raw/**', 'apps/api/test/**'],

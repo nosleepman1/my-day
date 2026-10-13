@@ -36,6 +36,15 @@ beforeAll(async () => {
 describe('ORBIT ESLint rules catch deliberate violations (TESTING.md §11)', () => {
   const RAW = 'declare const prisma: { $queryRaw: unknown; $queryRawUnsafe: unknown };\n';
 
+  it('reserves the raw PrismaService to platform, auth, users and admin (ADR-007-3)', async () => {
+    const code =
+      "import { PrismaService } from '../../platform/database/prisma.service';\nexport const s = PrismaService;\n";
+    const inIdeas = await messagesFor(code, 'apps/api/src/modules/ideas/ideas.repository.ts');
+    const inUsers = await messagesFor(code, 'apps/api/src/modules/users/users.repository.ts');
+    expect(inIdeas.join('\n')).toContain('TENANT_PRISMA');
+    expect(inUsers.join('\n')).not.toContain('TENANT_PRISMA');
+  });
+
   it('forbids raw SQL outside platform/database/raw (ADR-028)', async () => {
     const inModule = await messagesFor(
       `${RAW}export const q = prisma.$queryRaw;\n`,
