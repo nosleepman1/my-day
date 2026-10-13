@@ -11,7 +11,7 @@ Développement en 18 phases (voir [docs/ROADMAP.md](docs/ROADMAP.md)). Le socle 
 - **Monorepo pnpm :** `apps/api`, `apps/web`, `packages/contracts`, `packages/money`, `packages/config`
 - **API :** NestJS 11 (Express), Prisma 6, PostgreSQL 17, Zod 4, pino. Redis et BullMQ arrivent en PHASE-08.
 - **Web :** React 19, Vite 7, TypeScript, Tailwind CSS 4, React Router 7, TanStack Query 5.
-- **Tests :** Vitest 3 (SWC pour l'API, happy-dom pour le web), Testcontainers, fast-check, Playwright.
+- **Tests :** Vitest 4 (transpilation TypeScript pour l'API, happy-dom pour le web), Testcontainers, fast-check, Playwright.
 - **Exploitation :** front sur Vercel, API, worker et n8n sur un VPS (ADR-038).
 
 ## Prérequis
@@ -58,7 +58,7 @@ pnpm dev
 | `pnpm test:int` | Tests d'intégration de l'API sur PostgreSQL réel (Docker requis) |
 | `pnpm test:e2e` | Tests de bout en bout Playwright (base de développement démarrée et migrée) |
 | `pnpm infra:down` / `pnpm infra:reset` | Arrêter, ou réinitialiser la base locale |
-| `pnpm build` | Build des paquets, de l'API (SWC) et du front (Vite) |
+| `pnpm build` | Build des paquets, de l'API (`tsc`) et du front (Vite) |
 | `pnpm ci:local` | Rejoue toute la CI en local (audit, lint, types, tests, build, E2E isolé sur une base Docker dédiée) |
 
 ## Documentation

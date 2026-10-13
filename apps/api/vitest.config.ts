@@ -1,18 +1,36 @@
-import swc from 'unplugin-swc';
+import ts from 'typescript';
 import { defineConfig } from 'vitest/config';
 
-// SWC emet les metadonnees de decorateurs dont depend l injection NestJS (TESTING.md 3.1).
-const swcPlugin = swc.vite({
-  module: { type: 'es6' },
-  jsc: {
-    target: 'es2022',
-    parser: { syntax: 'typescript', decorators: true },
-    transform: { legacyDecorator: true, decoratorMetadata: true },
+type TranspiledModule = { code: string; map: string | null } | null;
+
+/**
+ * Transpilation TypeScript des sources de l'API avec emission des metadonnees de decorateurs dont depend
+ * l'injection NestJS (TESTING.md 3.1). Le compilateur TypeScript est du JavaScript pur : contrairement au
+ * binaire natif de SWC, le controle d'application de Windows ne peut pas le bloquer (ADR-040).
+ */
+const DECORATOR_OPTIONS: ts.CompilerOptions = {
+  target: ts.ScriptTarget.ES2022,
+  module: ts.ModuleKind.ESNext,
+  experimentalDecorators: true,
+  emitDecoratorMetadata: true,
+  useDefineForClassFields: false,
+  sourceMap: true,
+  inlineSources: true,
+};
+
+const typescriptDecorators = {
+  name: 'orbit:typescript-decorators',
+  enforce: 'pre' as const,
+  transform(code: string, id: string): TranspiledModule {
+    const file = id.split('?')[0] ?? id;
+    if (!file.endsWith('.ts') || file.includes('/node_modules/')) return null;
+    const output = ts.transpileModule(code, { fileName: file, compilerOptions: DECORATOR_OPTIONS });
+    return { code: output.outputText, map: output.sourceMapText ?? null };
   },
-});
+};
 
 export default defineConfig({
-  plugins: [swcPlugin],
+  plugins: [typescriptDecorators],
   test: {
     globals: false,
     setupFiles: ['./test/setup/unit.setup.ts'],
