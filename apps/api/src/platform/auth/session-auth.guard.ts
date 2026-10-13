@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 
 import { DomainError } from '../errors/domain-error';
 import { defaultMessageOf } from '../http/error-mapping';
+import { TenantContext } from '../tenant/tenant-context';
 
 import { IS_PUBLIC_KEY } from './public.decorator';
 import type { AuthenticatedRequest } from './session-context';
@@ -22,6 +23,7 @@ export class SessionAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @Inject(SESSION_RESOLVER) private readonly sessions: SessionResolverPort,
+    private readonly tenant: TenantContext,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -38,6 +40,8 @@ export class SessionAuthGuard implements CanActivate {
     const session = await this.sessions.resolve(token);
     if (session === null) throw unauthenticated();
     request.orbitSession = session;
+    // Contexte CLS : lu par le client Prisma cloisonné et, plus tard, par l'audit (ADR-007-2).
+    this.tenant.attachSession(session);
     return true;
   }
 }

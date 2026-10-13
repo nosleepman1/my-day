@@ -1,8 +1,9 @@
 import type { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { DomainError } from '../errors/domain-error';
+import type { TenantContext } from '../tenant/tenant-context';
 
 import { Public } from './public.decorator';
 import { SessionAuthGuard } from './session-auth.guard';
@@ -31,6 +32,10 @@ function contextFor(handler: () => string, request: AuthenticatedRequest): Execu
   } as unknown as ExecutionContext;
 }
 
+function fakeTenant(): TenantContext & { attachSession: ReturnType<typeof vi.fn> } {
+  return { attachSession: vi.fn() } as unknown as TenantContext & { attachSession: ReturnType<typeof vi.fn> };
+}
+
 function resolverReturning(session: AuthenticatedSession | null): SessionResolverPort & { calls: string[] } {
   const calls: string[] = [];
   return {
@@ -47,7 +52,7 @@ describe('SessionAuthGuard (SECURITY.md §3.1)', () => {
 
   it('lets @Public() routes through without looking at the cookie', async () => {
     const resolver = resolverReturning(null);
-    const guard = new SessionAuthGuard(new Reflector(), resolver);
+    const guard = new SessionAuthGuard(new Reflector(), resolver, fakeTenant());
 
     await expect(guard.canActivate(contextFor(controller.open, { headers: {} }))).resolves.toBe(true);
     expect(resolver.calls).toHaveLength(0);
@@ -56,11 +61,15 @@ describe('SessionAuthGuard (SECURITY.md §3.1)', () => {
   it('attaches the resolved session to the request', async () => {
     const request: AuthenticatedRequest = { headers: { cookie: `__Host-orbit_sid=${TOKEN}` } };
     const resolver = resolverReturning(SESSION);
+    const tenant = fakeTenant();
 
     await expect(
-      new SessionAuthGuard(new Reflector(), resolver).canActivate(contextFor(controller.closed, request)),
+      new SessionAuthGuard(new Reflector(), resolver, tenant).canActivate(
+        contextFor(controller.closed, request),
+      ),
     ).resolves.toBe(true);
     expect(resolver.calls).toEqual([TOKEN]);
+    expect(tenant.attachSession).toHaveBeenCalledWith(SESSION);
     expect(request.orbitSession).toEqual(SESSION);
   });
 
@@ -69,7 +78,7 @@ describe('SessionAuthGuard (SECURITY.md §3.1)', () => {
     ['with a malformed cookie', { cookie: '__Host-orbit_sid=short' }, SESSION],
     ['when the session is not valid', { cookie: `__Host-orbit_sid=${TOKEN}` }, null],
   ])('answers UNAUTHENTICATED %s', async (_label, headers, session) => {
-    const guard = new SessionAuthGuard(new Reflector(), resolverReturning(session));
+    const guard = new SessionAuthGuard(new Reflector(), resolverReturning(session), fakeTenant());
 
     const error: unknown = await guard
       .canActivate(contextFor(controller.closed, { headers }))

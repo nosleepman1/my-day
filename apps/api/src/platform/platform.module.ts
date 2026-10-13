@@ -10,6 +10,7 @@ import { IdsModule } from './ids/ids.module';
 import { MailModule } from './mail/mail.module';
 import { HealthController } from './observability/health.controller';
 import { ObservabilityModule } from './observability/observability.module';
+import { TenantModule } from './tenant/tenant.module';
 import { TimeModule } from './time/time.module';
 
 /**
@@ -20,6 +21,7 @@ import { TimeModule } from './time/time.module';
   imports: [
     ConfigModule,
     ObservabilityModule,
+    TenantModule,
     DatabaseModule,
     IdsModule,
     TimeModule,
