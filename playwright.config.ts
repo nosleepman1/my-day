@@ -46,6 +46,8 @@ export default defineConfig({
         APP_ORIGIN: webUrl,
         LOG_LEVEL: 'warn',
         DATABASE_URL: e2eDatabaseUrl,
+        SMTP_PORT: process.env['ORBIT_SMTP_PORT'] ?? '1025',
+        MAIL_FROM: 'ORBIT <no-reply@orbit.localhost>',
       },
     },
     {

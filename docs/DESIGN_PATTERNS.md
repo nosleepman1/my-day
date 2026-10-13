@@ -80,7 +80,7 @@ La liaison port → adaptateur se fait dans le module de plateforme par `useFact
 
 **Quand :** tout accès Prisma à une table métier. Le repository est le seul fichier d'un module qui touche Prisma.
 
-L'extension `tenantScope` (ADR-007-3) est appliquée au client injecté. Elle ajoute `userId` au `where` et au `data`, refuse `findUnique`, et lève `MissingTenantContextError` sans contexte.
+L'extension `tenantScope` (ADR-007-3, `platform/database/tenant-scope.extension.ts`) est appliquée au client `TENANT_PRISMA`, seul client autorisé dans les modules métier. Elle ajoute `userId` au `where` et au `data` ; un `userId` différent fourni par l'appelant est combiné en `AND` (aucune ligne trouvée) dans un filtre, et refusé pour une cible unique (`update`, `delete`, `upsert`) ; elle refuse `findUnique`, tout changement de `userId`, toute opération non prévue et tout modèle non cloisonné, et lève `MissingTenantContextError` sans contexte (nestjs-cls, alimenté par le guard global ou `TenantContext.runAsUser`).
 
 ```ts
 // apps/api/src/platform/database/tenant-scope.extension.ts (extrait)
@@ -90,18 +90,15 @@ export const tenantScopeExtension = (tenant: TenantContext) =>
     query: {
       $allModels: {
         $allOperations({ model, operation, args, query }) {
-          if (UNSCOPED_MODELS.has(model)) return query(args);
-          if (operation === 'findUnique' || operation === 'findUniqueOrThrow') {
-            throw new TenantScopeViolationError(model, operation);
-          }
-          return query(scopeArgs(operation, args, tenant.requireUserId()));
+          assertScopedModel(model); // un modèle non cloisonné passe par PrismaService, jamais par ce client
+          return query(scopeArgs(operation, args, requireUserId())); // findUnique et opérations inconnues refusées
         },
       },
     },
   });
 ```
 
-`UNSCOPED_MODELS` = `users`, `sessions`, `email_verification_tokens`, `password_reset_tokens`, `currencies`, `feature_flags`. Ces modèles ne sont accessibles que via `PrismaService.unscoped`, autorisé par lint dans `platform/auth`, `modules/auth`, `modules/users`, `modules/admin` uniquement.
+`UNSCOPED_MODELS` = `users`, `sessions`, `email_verification_tokens`, `password_reset_tokens` (puis `currencies`, `feature_flags` quand ces tables arriveront). Ces modèles ne sont accessibles que par le client brut `PrismaService`, dont l'import est interdit par lint dans `modules/**` sauf `modules/auth`, `modules/users` et `modules/admin`.
 
 ```ts
 // apps/api/src/modules/ideas/ideas.repository.ts

@@ -7,6 +7,7 @@ const VALID = {
   APP_ENV: 'test',
   APP_ORIGIN: 'http://localhost:5173',
   DATABASE_URL: 'postgresql://orbit_app:fake-password@localhost:5432/orbit',
+  MAIL_FROM: 'ORBIT <no-reply@orbit.localhost>',
 } as const;
 
 const noSecretFile = (): string => {
@@ -91,6 +92,70 @@ describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
         () => VALID.DATABASE_URL,
       ),
     ).toThrow(/APP_ORIGIN/);
+  });
+
+  it('defaults the mail transport to the local Mailpit SMTP server', () => {
+    const env = loadEnv(VALID, noSecretFile);
+    expect(env.MAIL_DRIVER).toBe('smtp');
+    expect(env.SMTP_HOST).toBe('127.0.0.1');
+    expect(env.SMTP_PORT).toBe(1025);
+    expect(env.MAIL_FROM).toBe(VALID.MAIL_FROM);
+  });
+
+  it('requires MAIL_FROM and refuses line breaks in it (header injection)', () => {
+    const { MAIL_FROM: _omitted, ...withoutFrom } = VALID;
+    expect(() => loadEnv(withoutFrom, noSecretFile)).toThrow(/MAIL_FROM/);
+    expect(() => loadEnv({ ...VALID, MAIL_FROM: 'ORBIT <a@b.test>\r\nBcc: x@y.test' }, noSecretFile)).toThrow(
+      /MAIL_FROM/,
+    );
+  });
+
+  it('refuses an unknown mail driver and an invalid SMTP port', () => {
+    expect(() => loadEnv({ ...VALID, MAIL_DRIVER: 'sendmail' }, noSecretFile)).toThrow(/MAIL_DRIVER/);
+    expect(() => loadEnv({ ...VALID, SMTP_PORT: '70000' }, noSecretFile)).toThrow(/SMTP_PORT/);
+  });
+
+  it('defaults registration to the allowlist mode with production hashing costs (ADR-026, ADR-006)', () => {
+    const env = loadEnv(VALID, noSecretFile);
+    expect(env.REGISTRATION_MODE).toBe('allowlist');
+    expect(env.REGISTRATION_ALLOWLIST).toEqual([]);
+    expect(env.ARGON2_MEMORY_KIB).toBe(65_536);
+    expect(env.ARGON2_ITERATIONS).toBe(3);
+    expect(env.AUTH_UNIFORM_RESPONSE_MS).toBe(750);
+  });
+
+  it('normalises the allowlist and rejects an invalid address in it', () => {
+    const env = loadEnv(
+      { ...VALID, REGISTRATION_ALLOWLIST: ' Abdou@Example.TEST, ,aminata@example.test ' },
+      noSecretFile,
+    );
+    expect(env.REGISTRATION_ALLOWLIST).toEqual(['abdou@example.test', 'aminata@example.test']);
+    expect(() => loadEnv({ ...VALID, REGISTRATION_ALLOWLIST: 'not-an-email' }, noSecretFile)).toThrow(
+      /REGISTRATION_ALLOWLIST/,
+    );
+    expect(() => loadEnv({ ...VALID, REGISTRATION_MODE: 'public' }, noSecretFile)).toThrow(
+      /REGISTRATION_MODE/,
+    );
+  });
+
+  it('refuses test-only hashing costs and a disabled response floor once deployed', () => {
+    const { DATABASE_URL: _plain, ...rest } = VALID;
+    const deployed = {
+      ...rest,
+      NODE_ENV: 'production',
+      APP_ENV: 'production',
+      APP_ORIGIN: 'https://orbit.example.com',
+      DATABASE_URL_FILE: '/run/secrets/database_url',
+    };
+    const readDatabaseUrl = (): string => VALID.DATABASE_URL;
+
+    expect(() => loadEnv(deployed, readDatabaseUrl)).not.toThrow();
+    expect(() => loadEnv({ ...deployed, ARGON2_MEMORY_KIB: '1024' }, readDatabaseUrl)).toThrow(
+      /ARGON2_MEMORY_KIB/,
+    );
+    expect(() => loadEnv({ ...deployed, AUTH_UNIFORM_RESPONSE_MS: '0' }, readDatabaseUrl)).toThrow(
+      /AUTH_UNIFORM_RESPONSE_MS/,
+    );
   });
 
   it('reports an unreadable secret file without leaking its content', () => {

@@ -3,11 +3,7 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "builder": {
-      "type": "swc",
-      "options": { "stripLeadingPaths": true, "ignore": ["**/*.spec.ts"] }
-    },
-    "typeCheck": false,
+    "builder": "tsc",
     "deleteOutDir": true,
     "tsConfigPath": "tsconfig.build.json"
   }

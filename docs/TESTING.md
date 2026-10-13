@@ -42,7 +42,7 @@ Règles :
 
 | Besoin | Outil | Remarque |
 |---|---|---|
-| Exécuteur API | **Vitest + SWC** (`unplugin-swc`) | SWC émet les métadonnées de décorateurs requises par l'injection de dépendances NestJS. |
+| Exécuteur API | **Vitest + transpilation TypeScript** (plugin `orbit:typescript-decorators`, ADR-040) | `ts.transpileModule` émet les métadonnées de décorateurs requises par l'injection de dépendances NestJS, sans binaire natif. |
 | Exécuteur web | **Vitest + Testing Library** (`@testing-library/react`, `user-event`, `jest-dom`) | Environnement `happy-dom` (jsdom est écarté : il remplace AbortSignal de façon incompatible avec le fetch de Node). |
 | Base de données | **Testcontainers PostgreSQL** | Même version majeure que la production (version épinglée dans `INFRASTRUCTURE.md`). Redis via Testcontainers à partir de PHASE-08. |
 | HTTP API | `supertest` sur l'application Nest démarrée | Le test exerce les guards, pipes et filtres réels. |
@@ -58,7 +58,7 @@ Règles :
 **Vitest (API).**
 - Trois projets Vitest : `unit` (`src/**/*.spec.ts`), `integration` (`test/integration/**/*.int.spec.ts`), `contract` (isolation, sécurité, architecture, migrations, propriétés).
 - `globals: false` : imports explicites. `pool: 'forks'` pour l'intégration (binaires natifs Prisma). Délais : unitaire 5 s, intégration 30 s, propriétés 120 s.
-- `unplugin-swc` avec `decoratorMetadata`, décorateurs hérités et cible `es2022`.
+- Plugin `orbit:typescript-decorators` (`ts.transpileModule`) avec `emitDecoratorMetadata`, décorateurs hérités, `useDefineForClassFields: false` et cible `es2022` (ADR-040).
 - `setupFiles` : `reflect-metadata`, forçage du fuseau, horloge injectée.
 - `bail` désactivé en CI (on veut la liste complète des échecs). `.only` interdit (lint + CI). `.skip` interdit sans référence de ticket (`// SKIP(ORBIT-123): raison`).
 

@@ -20,3 +20,8 @@ export function mapPrismaError(error: unknown): ErrorCode | undefined {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return undefined;
   return PRISMA_TO_API[error.code] ?? 'INTERNAL_ERROR';
 }
+
+/** Violation d'unicité (P2002), par exemple deux inscriptions simultanées sur la même adresse. */
+export function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
