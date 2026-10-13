@@ -26,6 +26,8 @@ const DEFAULT_MESSAGES: Partial<Record<ErrorCode, string>> = {
   UNSUPPORTED_MEDIA_TYPE: 'Type de contenu non accepté.',
   RATE_LIMITED: 'Trop de requêtes. Réessayez plus tard.',
   SERVICE_UNAVAILABLE: 'Service momentanément indisponible.',
+  INVALID_CREDENTIALS: 'Adresse e-mail ou mot de passe incorrect.',
+  EMAIL_NOT_VERIFIED: "Votre adresse e-mail n'est pas encore vérifiée.",
   GONE: 'Ce lien ou cette ressource a expiré.',
   VERSION_CONFLICT: 'La ressource a été modifiée entre-temps.',
   PRECONDITION_REQUIRED: 'Version de la ressource requise.',

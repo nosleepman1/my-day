@@ -4,6 +4,7 @@ import { createZodDto, ZodSerializerDto } from 'nestjs-zod';
 
 import { HealthResponseSchema, type HealthResponse } from '@orbit/contracts';
 
+import { Public } from '../auth/public.decorator';
 import { PrismaService } from '../database/prisma.service';
 import { pingDatabase } from '../database/raw/health.queries';
 import { DomainError } from '../errors/domain-error';
@@ -14,6 +15,7 @@ class HealthResponseDto extends createZodDto(HealthResponseSchema) {}
 const OK: HealthResponse = { data: { status: 'ok' } };
 
 /** Sondes publiques, sans version ni détail interne (API.md §14.2, ADR-038). */
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(

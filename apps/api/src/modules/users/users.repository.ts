@@ -16,7 +16,12 @@ export type AccountSummary = Readonly<{
 
 export type CreateAccountInput = Readonly<{ email: string; passwordHash: string; displayName: string }>;
 
+/** Données nécessaires à la connexion ; ne sortent jamais du module auth. */
+export type UserCredentials = AccountSummary &
+  Readonly<{ displayName: string; passwordHash: string; role: 'USER' | 'ADMIN' }>;
+
 const ACCOUNT_SUMMARY = { id: true, email: true, emailVerifiedAt: true, status: true } as const;
+const CREDENTIALS = { ...ACCOUNT_SUMMARY, displayName: true, passwordHash: true, role: true } as const;
 
 /**
  * Accès aux tables `users` et `user_preferences` (modèles non scopés, DESIGN_PATTERNS.md §3) :
@@ -62,5 +67,18 @@ export class UsersRepository {
       data: { emailVerifiedAt: at },
     });
     return count === 1;
+  }
+
+  findCredentialsByEmail(email: string): Promise<UserCredentials | null> {
+    return this.prisma.user.findFirst({ where: { email }, select: CREDENTIALS });
+  }
+
+  /** `last_login_at` et, si les paramètres argon2id ont changé, la nouvelle empreinte. */
+  async recordSuccessfulLogin(userId: string, at: Date, newPasswordHash: string | null): Promise<void> {
+    await this.prisma.user.updateMany({
+      where: { id: userId },
+      data:
+        newPasswordHash === null ? { lastLoginAt: at } : { lastLoginAt: at, passwordHash: newPasswordHash },
+    });
   }
 }

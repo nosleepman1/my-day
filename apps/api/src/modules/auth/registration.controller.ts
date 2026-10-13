@@ -3,6 +3,8 @@ import { ZodSerializerDto } from 'nestjs-zod';
 
 import type { AcceptedResponse } from '@orbit/contracts';
 
+import { Public } from '../../platform/auth/public.decorator';
+
 import {
   AcceptedResponseDto,
   RegisterRequestDto,
@@ -13,9 +15,9 @@ import { RegistrationService } from './registration.service';
 const ACCEPTED: AcceptedResponse = { data: { status: 'accepted' } };
 
 /**
- * Routes publiques d'inscription (API.md §14.3). `@Public` et la limitation de débit arrivent avec
- * le guard global de session (T6) et le throttling (T8).
+ * Routes publiques d'inscription (API.md §14.3). La limitation de débit arrive en T8.
  */
+@Public()
 @Controller('auth')
 export class RegistrationController {
   constructor(private readonly registration: RegistrationService) {}

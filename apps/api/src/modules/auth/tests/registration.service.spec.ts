@@ -75,6 +75,8 @@ function settings(overrides: Partial<AuthSettings> = {}): AuthSettings {
     registrationMode: 'open',
     registrationAllowlist: new Set(),
     uniformResponseMs: 0,
+    sessionIdleMs: 7 * 86_400_000,
+    sessionAbsoluteMs: 30 * 86_400_000,
     ...overrides,
   };
 }

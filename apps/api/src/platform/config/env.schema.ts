@@ -88,11 +88,21 @@ export const EnvSchema = z
     ARGON2_ITERATIONS: z.coerce.number().int().min(1).max(10).default(3),
     /** Durée plancher des réponses uniformes d'inscription et de renvoi (SECURITY.md §3.8). */
     AUTH_UNIFORM_RESPONSE_MS: z.coerce.number().int().min(0).max(5_000).default(750),
+    /** SECURITY.md §3.2 : inactivité glissante et durée absolue des sessions. */
+    SESSION_IDLE_DAYS: z.coerce.number().int().min(1).max(30).default(7),
+    SESSION_ABSOLUTE_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   })
   .superRefine((env, ctx) => {
     checkEnvironmentPair(env.NODE_ENV, env.APP_ENV, ctx);
     checkAppOrigin(env.APP_ORIGIN, env.APP_ENV, ctx);
     checkDeployedAuthCosts(env.ARGON2_MEMORY_KIB, env.AUTH_UNIFORM_RESPONSE_MS, env.APP_ENV, ctx);
+    if (env.SESSION_IDLE_DAYS > env.SESSION_ABSOLUTE_DAYS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SESSION_IDLE_DAYS'],
+        message: 'must not exceed SESSION_ABSOLUTE_DAYS',
+      });
+    }
     if (env.LOG_LEVEL === 'trace' && DEPLOYED_ENVS.has(env.APP_ENV)) {
       ctx.addIssue({
         code: 'custom',
