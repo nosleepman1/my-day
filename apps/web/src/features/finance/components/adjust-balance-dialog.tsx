@@ -35,6 +35,27 @@ interface AdjustFormState {
   reason: string;
 }
 
+function AdjustReasonField({
+  value,
+  onChange,
+}: Readonly<{ value: string; onChange: (v: string) => void }>): JSX.Element {
+  const { t } = useTranslation('finance');
+  return (
+    <div className="flex flex-col gap-1">
+      <Label htmlFor="adjust-reason">{t('adjustments.reason')}</Label>
+      <Input
+        id="adjust-reason"
+        required
+        placeholder={t('adjustments.reasonPlaceholder')}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+        }}
+      />
+    </div>
+  );
+}
+
 function AdjustFormFields({
   state,
   account,
@@ -72,18 +93,12 @@ function AdjustFormFields({
           ]}
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="adjust-reason">{t('adjustments.reason')}</Label>
-        <Input
-          id="adjust-reason"
-          required
-          placeholder={t('adjustments.reasonPlaceholder')}
-          value={state.reason}
-          onChange={(e) => {
-            onChange({ reason: e.target.value });
-          }}
-        />
-      </div>
+      <AdjustReasonField
+        value={state.reason}
+        onChange={(reason) => {
+          onChange({ reason });
+        }}
+      />
     </>
   );
 }

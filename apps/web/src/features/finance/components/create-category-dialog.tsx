@@ -76,18 +76,13 @@ function CategoryInputs({
   );
 }
 
-export function CreateCategoryDialog({
-  open,
-  onOpenChange,
-  defaultKind = 'EXPENSE',
-}: CreateCategoryDialogProps): JSX.Element {
+function useCategorySubmit(
+  form: CategoryFormState,
+  defaultKind: CategoryKind,
+  setForm: (fn: (c: CategoryFormState) => CategoryFormState) => void,
+  onOpenChange: (open: boolean) => void,
+) {
   const { t } = useTranslation(['finance', 'common']);
-  const [form, setForm] = useState<CategoryFormState>({
-    name: '',
-    kind: defaultKind,
-    color: '#0284c7',
-  });
-
   const mutation = useFinanceMutation((input: CreateCategory) => financeApi.createCategory(input), {
     successMessage: t('categories.createdSuccess'),
   });
@@ -105,9 +100,44 @@ export function CreateCategoryDialog({
       })
       .then(() => {
         onOpenChange(false);
-        setForm({ name: '', kind: defaultKind, color: '#0284c7' });
+        setForm(() => ({ name: '', kind: defaultKind, color: '#0284c7' }));
       });
   };
+
+  return { handleSubmit, isPending: mutation.isPending };
+}
+
+function CategoryDialogFooter({
+  onCancel,
+  isPending,
+  disabled,
+}: Readonly<{ onCancel: () => void; isPending: boolean; disabled: boolean }>): JSX.Element {
+  const { t } = useTranslation('common');
+  return (
+    <DialogFooter>
+      <Button variant="secondary" type="button" onClick={onCancel}>
+        {t('actions.cancel')}
+      </Button>
+      <Button type="submit" disabled={disabled}>
+        {isPending ? t('states.loading') : t('actions.save')}
+      </Button>
+    </DialogFooter>
+  );
+}
+
+export function CreateCategoryDialog({
+  open,
+  onOpenChange,
+  defaultKind = 'EXPENSE',
+}: CreateCategoryDialogProps): JSX.Element {
+  const { t } = useTranslation(['finance', 'common']);
+  const [form, setForm] = useState<CategoryFormState>({
+    name: '',
+    kind: defaultKind,
+    color: '#0284c7',
+  });
+
+  const { handleSubmit, isPending } = useCategorySubmit(form, defaultKind, setForm, onOpenChange);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,20 +152,13 @@ export function CreateCategoryDialog({
               setForm((c) => ({ ...c, ...p }));
             }}
           />
-          <DialogFooter>
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => {
-                onOpenChange(false);
-              }}
-            >
-              {t('common:actions.cancel')}
-            </Button>
-            <Button type="submit" disabled={mutation.isPending || form.name.trim() === ''}>
-              {mutation.isPending ? t('common:states.loading') : t('common:actions.save')}
-            </Button>
-          </DialogFooter>
+          <CategoryDialogFooter
+            onCancel={() => {
+              onOpenChange(false);
+            }}
+            isPending={isPending}
+            disabled={isPending || form.name.trim() === ''}
+          />
         </form>
       </DialogContent>
     </Dialog>

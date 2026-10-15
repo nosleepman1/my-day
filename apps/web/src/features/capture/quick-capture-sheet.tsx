@@ -251,7 +251,7 @@ function CaptureContent({
   text: string;
   onDone: () => void;
   kind: CaptureKind | null;
-  current?: CaptureType;
+  current?: CaptureType | undefined;
   dueDate: string;
   setDueDate: (val: string) => void;
   error: unknown;

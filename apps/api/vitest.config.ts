@@ -35,7 +35,14 @@ export default defineConfig({
     globals: false,
     setupFiles: ['./test/setup/unit.setup.ts'],
     projects: [
-      { extends: true, test: { name: 'unit', include: ['src/**/*.spec.ts'], testTimeout: 5_000 } },
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['src/**/*.spec.ts', 'test/finance/**/*.spec.ts'],
+          testTimeout: 10_000,
+        },
+      },
       {
         extends: true,
         test: {

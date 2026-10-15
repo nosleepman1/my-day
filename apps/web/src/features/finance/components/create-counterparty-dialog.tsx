@@ -74,14 +74,12 @@ function CounterpartyInputs({
   );
 }
 
-export function CreateCounterpartyDialog({ open, onOpenChange }: CreateCounterpartyDialogProps): JSX.Element {
+function useCounterpartySubmit(
+  form: CounterpartyFormState,
+  setForm: (fn: (c: CounterpartyFormState) => CounterpartyFormState) => void,
+  onOpenChange: (open: boolean) => void,
+) {
   const { t } = useTranslation(['finance', 'common']);
-  const [form, setForm] = useState<CounterpartyFormState>({
-    name: '',
-    kind: 'PERSON',
-    notes: '',
-  });
-
   const mutation = useFinanceMutation((input: CreateCounterparty) => financeApi.createCounterparty(input), {
     successMessage: t('counterparties.createdSuccess'),
   });
@@ -96,9 +94,40 @@ export function CreateCounterpartyDialog({ open, onOpenChange }: CreateCounterpa
     };
     void mutation.mutateAsync(payload).then(() => {
       onOpenChange(false);
-      setForm({ name: '', kind: 'PERSON', notes: '' });
+      setForm(() => ({ name: '', kind: 'PERSON', notes: '' }));
     });
   };
+
+  return { handleSubmit, isPending: mutation.isPending };
+}
+
+function CounterpartyDialogFooter({
+  onCancel,
+  isPending,
+  disabled,
+}: Readonly<{ onCancel: () => void; isPending: boolean; disabled: boolean }>): JSX.Element {
+  const { t } = useTranslation('common');
+  return (
+    <DialogFooter>
+      <Button variant="secondary" type="button" onClick={onCancel}>
+        {t('actions.cancel')}
+      </Button>
+      <Button type="submit" disabled={disabled}>
+        {isPending ? t('states.loading') : t('actions.save')}
+      </Button>
+    </DialogFooter>
+  );
+}
+
+export function CreateCounterpartyDialog({ open, onOpenChange }: CreateCounterpartyDialogProps): JSX.Element {
+  const { t } = useTranslation(['finance', 'common']);
+  const [form, setForm] = useState<CounterpartyFormState>({
+    name: '',
+    kind: 'PERSON',
+    notes: '',
+  });
+
+  const { handleSubmit, isPending } = useCounterpartySubmit(form, setForm, onOpenChange);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -113,20 +142,13 @@ export function CreateCounterpartyDialog({ open, onOpenChange }: CreateCounterpa
               setForm((c) => ({ ...c, ...p }));
             }}
           />
-          <DialogFooter>
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => {
-                onOpenChange(false);
-              }}
-            >
-              {t('common:actions.cancel')}
-            </Button>
-            <Button type="submit" disabled={mutation.isPending || form.name.trim() === ''}>
-              {mutation.isPending ? t('common:states.loading') : t('common:actions.save')}
-            </Button>
-          </DialogFooter>
+          <CounterpartyDialogFooter
+            onCancel={() => {
+              onOpenChange(false);
+            }}
+            isPending={isPending}
+            disabled={isPending || form.name.trim() === ''}
+          />
         </form>
       </DialogContent>
     </Dialog>

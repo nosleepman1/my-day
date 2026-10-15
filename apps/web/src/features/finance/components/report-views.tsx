@@ -1,7 +1,12 @@
 import { useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { BalancesReport, CategoryKind, FinanceSummaryReport } from '@orbit/contracts';
+import type {
+  BalancesReport,
+  CategoryBreakdownItem,
+  CategoryKind,
+  FinanceSummaryReport,
+} from '@orbit/contracts';
 
 import { MoneyAmount } from '@/components/data-display/money-amount';
 import { EmptyState, ErrorState, LoadingState } from '@/components/data-display/states';
@@ -56,6 +61,30 @@ export function SummaryView({ report }: Readonly<{ report: FinanceSummaryReport 
   );
 }
 
+function CategoryBreakdownList({
+  categories,
+  currency,
+  kind,
+}: Readonly<{
+  categories: readonly CategoryBreakdownItem[];
+  currency: string;
+  kind: CategoryKind;
+}>): JSX.Element {
+  return (
+    <ul className="flex flex-col divide-y divide-border rounded-md border border-border bg-surface">
+      {categories.map((cat) => (
+        <li key={cat.categoryId ?? 'none'} className="flex items-center justify-between p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-body font-medium">{cat.categoryName}</span>
+            <Badge tone="neutral">{`${cat.percentage}%`}</Badge>
+          </div>
+          <MoneyAmount minor={cat.amountMinor} currency={currency} kind={kind === 'EXPENSE' ? 'out' : 'in'} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function CategoryBreakdownView({ currency }: Readonly<{ currency: string }>): JSX.Element {
   const { t } = useTranslation('finance');
   const [kind, setKind] = useState<CategoryKind>('EXPENSE');
@@ -90,21 +119,7 @@ export function CategoryBreakdownView({ currency }: Readonly<{ currency: string 
       {data.categories.length === 0 ? (
         <EmptyState title={t('reports.byCategory')} body={t('reports.noData')} />
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-md border border-border bg-surface">
-          {data.categories.map((cat) => (
-            <li key={cat.categoryId ?? 'none'} className="flex items-center justify-between p-3">
-              <div className="flex items-center gap-2">
-                <span className="text-body font-medium">{cat.categoryName}</span>
-                <Badge tone="neutral">{`${cat.percentage}%`}</Badge>
-              </div>
-              <MoneyAmount
-                minor={cat.amountMinor}
-                currency={currency}
-                kind={kind === 'EXPENSE' ? 'out' : 'in'}
-              />
-            </li>
-          ))}
-        </ul>
+        <CategoryBreakdownList categories={data.categories} currency={currency} kind={kind} />
       )}
     </div>
   );
