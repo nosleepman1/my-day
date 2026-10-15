@@ -178,11 +178,64 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
     };
   }
 
+  type FinanceFixture = Readonly<{
+    account: string;
+  }>;
+
+  async function financeFixture(owner: SignedInUser): Promise<FinanceFixture> {
+    const account = await createAs(owner, '/finance/accounts', {
+      name: `Compte ${randomUUID().slice(0, 8)}`,
+      type: 'BANK',
+      currency: 'XOF',
+      openedOn: '2026-01-01',
+    });
+    return { account };
+  }
+
+  type FinanceCase = Readonly<{
+    verb: Verb;
+    path: (fixture: FinanceFixture) => string;
+    body?: (fixture: FinanceFixture) => object;
+  }>;
+
+  const atFinance = (
+    verb: Verb,
+    path: FinanceCase['path'],
+    extra: Omit<FinanceCase, 'verb' | 'path'> = {},
+  ): FinanceCase => ({ verb, path, ...extra });
+
+  const FINANCE_CASES: Readonly<Record<string, FinanceCase>> = {
+    'GET /api/v1/finance/accounts/:id': atFinance('get', (f) => `/finance/accounts/${f.account}`),
+    'PATCH /api/v1/finance/accounts/:id': atFinance('patch', (f) => `/finance/accounts/${f.account}`, {
+      body: () => ({ name: 'Nouveau nom' }),
+    }),
+    'POST /api/v1/finance/accounts/:id/close': atFinance(
+      'post',
+      (f) => `/finance/accounts/${f.account}/close`,
+    ),
+    'POST /api/v1/finance/accounts/:id/reopen': atFinance(
+      'post',
+      (f) => `/finance/accounts/${f.account}/reopen`,
+    ),
+  };
+
+  function financeCase(spec: FinanceCase): CrossUserCase {
+    return async ({ owner, intruder }) => {
+      const fixture = await financeFixture(owner);
+      const agent = http();
+      return agent[spec.verb](`/api/v1${spec.path(fixture)}`)
+        .set(CSRF_HEADERS)
+        .set('Cookie', intruder.cookie)
+        .send(spec.body?.(fixture) ?? {});
+    };
+  }
+
   /** « L'utilisateur B obtient 404 sur la ressource de A », une entrée par route privée avec `:id`. */
   const CROSS_USER_CASES: Readonly<Record<string, CrossUserCase>> = {
     ...Object.fromEntries(
       Object.entries(ORGANIZATION_CASES).map(([key, spec]) => [key, organizationCase(spec)]),
     ),
+    ...Object.fromEntries(Object.entries(FINANCE_CASES).map(([key, spec]) => [key, financeCase(spec)])),
     'DELETE /api/v1/me/sessions/:id': async ({ owner, intruder }) => {
       const session = await prisma.session.findFirstOrThrow({
         where: { userId: owner.userId, revokedAt: null },

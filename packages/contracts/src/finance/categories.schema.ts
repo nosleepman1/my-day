@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { InstantSchema } from '../common/dates';
-import { dataEnvelope, listEnvelope } from '../common/envelope';
+import { dataEnvelope } from '../common/envelope';
 import { HexColorSchema, optionalText, text } from '../organization/common';
 
 export const CATEGORY_KINDS = ['INCOME', 'EXPENSE'] as const;
@@ -68,5 +68,5 @@ export type CategoryResponse = z.infer<typeof CategoryResponseSchema>;
 export const CategoryEnvelopeSchema = dataEnvelope(CategoryResponseSchema);
 export type CategoryEnvelope = z.infer<typeof CategoryEnvelopeSchema>;
 
-export const CategoryListEnvelopeSchema = listEnvelope(CategoryResponseSchema);
+export const CategoryListEnvelopeSchema = z.object({ data: z.array(CategoryResponseSchema) });
 export type CategoryListEnvelope = z.infer<typeof CategoryListEnvelopeSchema>;

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { CurrencyCodeSchema, MoneyStringSchema } from '../common/amount';
 import { CivilDateSchema, InstantSchema } from '../common/dates';
-import { dataEnvelope, listEnvelope } from '../common/envelope';
+import { dataEnvelope } from '../common/envelope';
 import { HexColorSchema, optionalText, text } from '../organization/common';
 
 export const ACCOUNT_TYPES = ['CASH', 'MOBILE_MONEY', 'BANK', 'PAYMENT_ACCOUNT', 'OTHER'] as const;
@@ -89,5 +89,5 @@ export type AccountResponse = z.infer<typeof AccountResponseSchema>;
 export const AccountEnvelopeSchema = dataEnvelope(AccountResponseSchema);
 export type AccountEnvelope = z.infer<typeof AccountEnvelopeSchema>;
 
-export const AccountListEnvelopeSchema = listEnvelope(AccountResponseSchema);
+export const AccountListEnvelopeSchema = z.object({ data: z.array(AccountResponseSchema) });
 export type AccountListEnvelope = z.infer<typeof AccountListEnvelopeSchema>;
