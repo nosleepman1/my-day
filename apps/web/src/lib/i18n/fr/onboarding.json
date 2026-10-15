@@ -1,0 +1,17 @@
+{
+  "step": "Étape {{current}} sur {{total}}",
+  "welcome": {
+    "title": "Bienvenue dans ORBIT",
+    "body": "Votre système personnel pour vos tâches, idées, finances et projets. Trois questions et c'est parti."
+  },
+  "region": {
+    "title": "Votre région",
+    "body": "Les dates et les montants seront affichés selon ces réglages."
+  },
+  "modules": {
+    "title": "Vos modules",
+    "body": "Gardez seulement ce qui vous sert. Vous pourrez changer d'avis dans les paramètres."
+  },
+  "next": "Suivant",
+  "finish": "Commencer"
+}
