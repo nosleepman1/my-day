@@ -27,6 +27,7 @@ describe('TransactionsService', () => {
     list: ReturnType<typeof vi.fn>;
     updateDetails: ReturnType<typeof vi.fn>;
     validate: ReturnType<typeof vi.fn>;
+    cancel: ReturnType<typeof vi.fn>;
     deletePending: ReturnType<typeof vi.fn>;
   };
   let mockCategoriesRepo: {
@@ -126,6 +127,11 @@ describe('TransactionsService', () => {
       list: vi.fn().mockResolvedValue({ rows: [sampleTxRecord], hasMore: false, nextCursor: null }),
       updateDetails: vi.fn().mockResolvedValue(sampleTxRecord),
       validate: vi.fn().mockResolvedValue(sampleTxRecord),
+      cancel: vi.fn().mockResolvedValue({
+        ...sampleTxRecord,
+        status: 'CANCELLED',
+        cancelReason: 'Motif',
+      }),
       deletePending: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -348,6 +354,35 @@ describe('TransactionsService', () => {
         expect.objectContaining({
           action: 'finance.transaction.delete',
           userId: USER_1,
+        }),
+      );
+    });
+  });
+
+  describe('cancel', () => {
+    it('cancels a transaction, validates input and records audit', async () => {
+      const cancelledRecord: TransactionWithEntries = {
+        ...sampleTxRecord,
+        status: 'CANCELLED',
+        cancelReason: 'Erreur de montant',
+        cancelledAt: new Date('2026-02-05T00:00:00.000Z'),
+      };
+      mockRepo.cancel.mockResolvedValue(cancelledRecord);
+
+      const result = await service.cancel(USER_1, TX_1, {
+        reason: 'Erreur de montant',
+      });
+
+      expect(result.status).toBe('CANCELLED');
+      expect(result.cancelReason).toBe('Erreur de montant');
+      expect(mockRepo.cancel).toHaveBeenCalledWith(USER_1, TX_1, 'Erreur de montant');
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'finance.transaction.cancel',
+          userId: USER_1,
+          entityType: 'Transaction',
+          entityId: TX_1,
+          outcome: 'SUCCESS',
         }),
       );
     });

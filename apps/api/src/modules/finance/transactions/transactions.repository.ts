@@ -14,6 +14,7 @@ import type {
 import { AccountLockingQueries } from '../../../platform/database/raw/account-locking.queries';
 import { DomainError } from '../../../platform/errors/domain-error';
 import { decodeCursor, encodeCursor } from '../../../platform/http/cursor';
+import { assertCanCancelTransaction } from '../domain/cancellation-rules';
 import { FinanceContext } from '../shared/finance-context';
 
 export interface CreateTransactionDbParams {
@@ -398,6 +399,84 @@ export class TransactionsRepository {
       await tx.transaction.delete({
         where: { userId_id: { userId, id } },
       });
+    });
+  }
+
+  private async checkOverdraftOnCancel(
+    txClient: Prisma.TransactionClient,
+    userId: string,
+    records: readonly TransactionWithEntries[],
+    accountMap: Map<string, FinancialAccount>,
+  ): Promise<void> {
+    for (const record of records) {
+      for (const entry of record.ledgerEntries) {
+        if (entry.direction === 'CREDIT') {
+          const account = accountMap.get(entry.accountId);
+          if (!account) {
+            throw new DomainError('NOT_FOUND', 'Compte financier introuvable.');
+          }
+          await this.assertOverdraftForEntry(txClient, userId, account, entry.amountMinor);
+        }
+      }
+    }
+  }
+
+  private async updateCancelledRecords(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    id: string,
+    reason: string,
+  ): Promise<TransactionWithEntries> {
+    const cancelledAt = this.ctx.now();
+    await tx.transaction.updateMany({
+      where: { userId, parentTransactionId: id },
+      data: { status: 'CANCELLED', cancelReason: reason, cancelledAt },
+    });
+    return tx.transaction.update({
+      where: { userId_id: { userId, id } },
+      data: { status: 'CANCELLED', cancelReason: reason, cancelledAt },
+      include: { ledgerEntries: true },
+    });
+  }
+
+  async cancel(userId: string, id: string, reason: string): Promise<TransactionWithEntries> {
+    return this.ctx.db.$transaction(async (tx) => {
+      const txRecord = await tx.transaction.findFirst({
+        where: { userId, id },
+        include: { ledgerEntries: true },
+      });
+
+      if (!txRecord) {
+        throw new DomainError('NOT_FOUND', 'Transaction introuvable.');
+      }
+
+      assertCanCancelTransaction({
+        currentStatus: txRecord.status,
+        cancelReason: reason,
+        isChildTransaction: !!txRecord.parentTransactionId,
+      });
+
+      const children = (await tx.transaction.findMany({
+        where: { userId, parentTransactionId: id },
+        include: { ledgerEntries: true },
+      })) as TransactionWithEntries[];
+
+      if (txRecord.status === 'VALIDATED') {
+        const allEntries = [...txRecord.ledgerEntries, ...children.flatMap((c) => c.ledgerEntries)];
+        const accountIds = Array.from(new Set(allEntries.map((e) => e.accountId)));
+        if (accountIds.length > 0) {
+          const txClient = tx as unknown as Prisma.TransactionClient;
+          await this.accountLocking.lockAccounts(txClient, userId, accountIds);
+
+          const accounts = await tx.financialAccount.findMany({
+            where: { userId, id: { in: accountIds } },
+          });
+          const accountMap = new Map(accounts.map((a) => [a.id, a]));
+          await this.checkOverdraftOnCancel(txClient, userId, [txRecord, ...children], accountMap);
+        }
+      }
+
+      return this.updateCancelledRecords(tx as unknown as Prisma.TransactionClient, userId, id, reason);
     });
   }
 }

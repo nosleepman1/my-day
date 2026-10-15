@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import type {
+  CancelTransaction,
   CreateTransaction,
   CreateTransactionInput,
   CurrencyCode,
@@ -11,7 +12,11 @@ import type {
   TransactionType,
   UpdateTransactionDetails,
 } from '@orbit/contracts';
-import { CreateTransactionSchema, UpdateTransactionDetailsSchema } from '@orbit/contracts';
+import {
+  CancelTransactionSchema,
+  CreateTransactionSchema,
+  UpdateTransactionDetailsSchema,
+} from '@orbit/contracts';
 
 import { AuditService } from '../../../platform/audit/audit.service';
 import { DomainError } from '../../../platform/errors/domain-error';
@@ -258,6 +263,24 @@ export class TransactionsService {
     });
 
     return toTransactionResponse(validated);
+  }
+
+  async cancel(userId: string, id: string, rawInput: CancelTransaction): Promise<TransactionResponse> {
+    const input = CancelTransactionSchema.parse(rawInput);
+    const cancelled = await this.repo.cancel(userId, id, input.reason);
+
+    await this.audit.record({
+      action: 'finance.transaction.cancel',
+      userId,
+      entityType: 'Transaction',
+      entityId: id,
+      outcome: 'SUCCESS',
+      metadata: {
+        reason: input.reason,
+      },
+    });
+
+    return toTransactionResponse(cancelled);
   }
 
   async delete(userId: string, id: string): Promise<void> {

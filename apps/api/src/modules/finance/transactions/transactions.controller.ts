@@ -18,6 +18,7 @@ import type { TransactionEnvelope, TransactionListEnvelope } from '@orbit/contra
 import { Idempotent } from '../../../platform/idempotency/idempotent.decorator';
 import { TenantContext } from '../../../platform/tenant/tenant-context';
 import {
+  CancelTransactionDto,
   CreateTransactionDto,
   IdParamDto,
   ListTransactionsQueryDto,
@@ -83,6 +84,17 @@ export class TransactionsController {
   @ZodSerializerDto(TransactionEnvelopeDto)
   async validate(@Param() params: IdParamDto): Promise<TransactionEnvelope> {
     const data = await this.transactions.validate(this.tenant.requireUserId(), params.id);
+    return { data };
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ZodSerializerDto(TransactionEnvelopeDto)
+  async cancel(
+    @Param() params: IdParamDto,
+    @Body() body: CancelTransactionDto,
+  ): Promise<TransactionEnvelope> {
+    const data = await this.transactions.cancel(this.tenant.requireUserId(), params.id, body);
     return { data };
   }
 

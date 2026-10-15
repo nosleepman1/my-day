@@ -18,6 +18,7 @@ describe('TransactionsController', () => {
     getById: ReturnType<typeof vi.fn>;
     updateDetails: ReturnType<typeof vi.fn>;
     validate: ReturnType<typeof vi.fn>;
+    cancel: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
   let mockTenant: {
@@ -53,6 +54,7 @@ describe('TransactionsController', () => {
       getById: vi.fn().mockResolvedValue(sampleResponse),
       updateDetails: vi.fn().mockResolvedValue(sampleResponse),
       validate: vi.fn().mockResolvedValue(sampleResponse),
+      cancel: vi.fn().mockResolvedValue(sampleResponse),
       delete: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -104,6 +106,13 @@ describe('TransactionsController', () => {
   it('validate delegates to service with user_id and param id', async () => {
     const result = await controller.validate({ id: TX_1 });
     expect(mockService.validate).toHaveBeenCalledWith(USER_1, TX_1);
+    expect(result).toEqual({ data: sampleResponse });
+  });
+
+  it('cancel delegates to service with user_id, param id and body', async () => {
+    const body = { reason: 'Erreur de saisie' };
+    const result = await controller.cancel({ id: TX_1 }, body);
+    expect(mockService.cancel).toHaveBeenCalledWith(USER_1, TX_1, body);
     expect(result).toEqual({ data: sampleResponse });
   });
 

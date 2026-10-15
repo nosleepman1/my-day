@@ -41,7 +41,9 @@ describe('TransactionsRepository', () => {
     transaction: {
       create: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
+      updateMany: ReturnType<typeof vi.fn>;
       delete: ReturnType<typeof vi.fn>;
     };
   };
@@ -87,12 +89,14 @@ describe('TransactionsRepository', () => {
           updatedAt: new Date('2026-02-01T00:00:00.000Z'),
         })),
         findFirst: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
         update: vi.fn().mockImplementation(({ data }: { data: Partial<Transaction> }) => ({
           id: TX_1,
           userId: USER_1,
           ...data,
           ledgerEntries: [],
         })),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
         delete: vi.fn().mockResolvedValue({ id: TX_1 }),
       },
     };
@@ -432,6 +436,125 @@ describe('TransactionsRepository', () => {
       });
 
       await expect(repository.deletePending(USER_1, TX_1)).rejects.toThrow(DomainError);
+    });
+  });
+
+  describe('cancel', () => {
+    it('cancels a VALIDATED transaction with valid reason and locks accounts', async () => {
+      mockTx.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'VALIDATED',
+        ledgerEntries: [
+          {
+            id: ENTRY_1,
+            accountId: ACCOUNT_1,
+            direction: 'DEBIT',
+            amountMinor: 5000n,
+            currency: 'XOF',
+          },
+        ],
+      });
+
+      const result = await repository.cancel(USER_1, TX_1, 'Erreur de saisie');
+      expect(result.status).toBe('CANCELLED');
+      expect(mockAccountLocking.lockAccounts).toHaveBeenCalledWith(mockTx, USER_1, [ACCOUNT_1]);
+      expect(mockTx.transaction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId_id: { userId: USER_1, id: TX_1 } },
+          data: expect.objectContaining({
+            status: 'CANCELLED',
+            cancelReason: 'Erreur de saisie',
+          }),
+        }),
+      );
+    });
+
+    it('cancels a PENDING transaction without locking if no entries', async () => {
+      mockTx.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'PENDING',
+        ledgerEntries: [],
+      });
+
+      const result = await repository.cancel(USER_1, TX_1, 'Annulation simple');
+      expect(result.status).toBe('CANCELLED');
+    });
+
+    it('rejects cancellation when already CANCELLED', async () => {
+      mockTx.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'CANCELLED',
+        ledgerEntries: [],
+      });
+
+      await expect(repository.cancel(USER_1, TX_1, 'Motif valide')).rejects.toThrow(DomainError);
+    });
+
+    it('rejects cancellation of VALIDATED transaction with reason shorter than 3 characters', async () => {
+      mockTx.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'VALIDATED',
+        ledgerEntries: [],
+      });
+
+      await expect(repository.cancel(USER_1, TX_1, 'no')).rejects.toThrow(DomainError);
+    });
+
+    it('rejects cancellation of CREDIT transaction when remaining balance violates overdraft', async () => {
+      mockTx.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'VALIDATED',
+        ledgerEntries: [
+          {
+            id: ENTRY_1,
+            accountId: ACCOUNT_1,
+            direction: 'CREDIT',
+            amountMinor: 80000n,
+            currency: 'XOF',
+          },
+        ],
+      });
+
+      mockTx.ledgerEntry.findMany.mockResolvedValue([
+        { direction: 'CREDIT', amountMinor: 80000n },
+        { direction: 'DEBIT', amountMinor: 150000n },
+      ]);
+
+      await expect(repository.cancel(USER_1, TX_1, 'Motif valide')).rejects.toThrow(DomainError);
+    });
+
+    it('cascades cancellation to child transactions', async () => {
+      mockTx.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'VALIDATED',
+        ledgerEntries: [],
+      });
+
+      mockTx.transaction.findMany.mockResolvedValue([
+        {
+          id: 'child-1',
+          userId: USER_1,
+          status: 'VALIDATED',
+          ledgerEntries: [],
+        },
+      ]);
+
+      await repository.cancel(USER_1, TX_1, 'Annulation cascade');
+      expect(mockTx.transaction.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: USER_1, parentTransactionId: TX_1 },
+          data: expect.objectContaining({
+            status: 'CANCELLED',
+            cancelReason: 'Annulation cascade',
+          }),
+        }),
+      );
     });
   });
 });
