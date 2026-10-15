@@ -113,15 +113,18 @@ export function resolveEconomicClass(
   if (categoryDefaultClass) {
     return categoryDefaultClass;
   }
-  if (type === 'TRANSFER' || treatment === 'DEBT_REPAYMENT' || treatment === 'CUSTOMER_CREDIT') {
-    return 'TRANSFER_INTERNAL';
+  if (type === 'TRANSFER' || treatment === 'CUSTOMER_CREDIT') {
+    return 'INTERNAL_TRANSFER';
+  }
+  if (treatment === 'DEBT_REPAYMENT') {
+    return type === 'INCOME' ? 'LOAN_COLLECTION' : 'DEBT_REPAYMENT';
   }
   if (type === 'INCOME') {
-    return treatment === 'GIFT' ? 'INCOME_EXTRAORDINARY' : 'INCOME_OPERATING';
+    return treatment === 'GIFT' ? 'GIFT_RECEIVED' : 'INCOME_OPERATING';
   }
   if (type === 'EXPENSE') {
-    return 'EXPENSE_OPERATING';
+    return treatment === 'GIFT' ? 'GIFT_GIVEN' : 'EXPENSE_OPERATING';
   }
   // ADJUSTMENT
-  return 'EXPENSE_EXTRAORDINARY';
+  return 'BALANCE_ADJUSTMENT';
 }

@@ -180,6 +180,7 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
 
   type FinanceFixture = Readonly<{
     account: string;
+    category: string;
   }>;
 
   async function financeFixture(owner: SignedInUser): Promise<FinanceFixture> {
@@ -189,7 +190,12 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       currency: 'XOF',
       openedOn: '2026-01-01',
     });
-    return { account };
+    const category = await createAs(owner, '/finance/categories', {
+      name: `Catégorie ${randomUUID().slice(0, 8)}`,
+      kind: 'EXPENSE',
+      defaultEconomicClass: 'EXPENSE_OPERATING',
+    });
+    return { account, category };
   }
 
   type FinanceCase = Readonly<{
@@ -217,6 +223,11 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       'post',
       (f) => `/finance/accounts/${f.account}/reopen`,
     ),
+    'GET /api/v1/finance/categories/:id': atFinance('get', (f) => `/finance/categories/${f.category}`),
+    'PATCH /api/v1/finance/categories/:id': atFinance('patch', (f) => `/finance/categories/${f.category}`, {
+      body: () => ({ name: 'Nouveau nom catégorie' }),
+    }),
+    'DELETE /api/v1/finance/categories/:id': atFinance('delete', (f) => `/finance/categories/${f.category}`),
   };
 
   function financeCase(spec: FinanceCase): CrossUserCase {

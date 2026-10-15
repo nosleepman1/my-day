@@ -10,12 +10,19 @@ export type CategoryKind = z.infer<typeof CategoryKindSchema>;
 
 export const ECONOMIC_CLASSES = [
   'INCOME_OPERATING',
-  'INCOME_EXTRAORDINARY',
+  'INCOME_OTHER',
+  'GIFT_RECEIVED',
+  'LOAN_COLLECTION',
   'EXPENSE_OPERATING',
-  'EXPENSE_ESSENTIAL',
-  'EXPENSE_EXTRAORDINARY',
-  'TRANSFER_INTERNAL',
-  'CAPITAL_INVESTMENT',
+  'EXPENSE_FEE',
+  'GIFT_GIVEN',
+  'DEBT_REPAYMENT',
+  'INTERNAL_TRANSFER',
+  'DEBT_DRAWDOWN',
+  'LOAN_DISBURSEMENT',
+  'REFUND_RECEIVED',
+  'REFUND_ISSUED',
+  'BALANCE_ADJUSTMENT',
 ] as const;
 export const EconomicClassSchema = z.enum(ECONOMIC_CLASSES);
 export type EconomicClass = z.infer<typeof EconomicClassSchema>;

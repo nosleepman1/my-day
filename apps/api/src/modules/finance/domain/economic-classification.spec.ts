@@ -117,11 +117,11 @@ describe('economic-classification (FINANCE_RULES §4.1, §4.2)', () => {
 
   it('resolves economic class defaults properly', () => {
     expect(resolveEconomicClass('INCOME', 'STANDARD')).toBe('INCOME_OPERATING');
-    expect(resolveEconomicClass('INCOME', 'GIFT')).toBe('INCOME_EXTRAORDINARY');
+    expect(resolveEconomicClass('INCOME', 'GIFT')).toBe('GIFT_RECEIVED');
     expect(resolveEconomicClass('EXPENSE', 'STANDARD')).toBe('EXPENSE_OPERATING');
-    expect(resolveEconomicClass('TRANSFER', 'STANDARD')).toBe('TRANSFER_INTERNAL');
-    expect(resolveEconomicClass('ADJUSTMENT', 'STANDARD')).toBe('EXPENSE_EXTRAORDINARY');
-    expect(resolveEconomicClass('EXPENSE', 'STANDARD', 'EXPENSE_ESSENTIAL')).toBe('EXPENSE_ESSENTIAL');
+    expect(resolveEconomicClass('TRANSFER', 'STANDARD')).toBe('INTERNAL_TRANSFER');
+    expect(resolveEconomicClass('ADJUSTMENT', 'STANDARD')).toBe('BALANCE_ADJUSTMENT');
+    expect(resolveEconomicClass('EXPENSE', 'STANDARD', 'EXPENSE_FEE')).toBe('EXPENSE_FEE');
   });
 
   describe('property-based tests (fast-check)', () => {
