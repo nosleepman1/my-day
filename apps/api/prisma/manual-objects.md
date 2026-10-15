@@ -32,3 +32,58 @@ Objets que Prisma ne sait pas exprimer, écrits à la main dans les migrations (
 | `trg_audit_logs__no_truncate` | déclencheur | audit_logs | 20261012091116_phase01_identity |
 | `REVOKE UPDATE, DELETE, TRUNCATE … FROM orbit_app` | droits | login_events, audit_logs | 20261012091116_phase01_identity |
 | Rôle `orbit_app`, `REVOKE … FROM PUBLIC`, privilèges par défaut | droits | — | 20261011000100_phase00_roles_and_privileges |
+| `ideas_user_id_converted_project_id_fkey` | FK composite ON DELETE SET NULL (colonne) | ideas | 20261014000000_phase04_organization |
+| `tasks_user_id_project_id_fkey` | FK composite ON DELETE SET NULL (colonne) | tasks | 20261014000000_phase04_organization |
+| `tasks_user_id_idea_id_fkey` | FK composite ON DELETE SET NULL (colonne) | tasks | 20261014000000_phase04_organization |
+| `f_unaccent(text)` | fonction IMMUTABLE | — | 20261014000000_phase04_organization |
+| `ck_ideas__potential_score` | CHECK | ideas | 20261014000000_phase04_organization |
+| `ck_ideas__description_len` | CHECK | ideas | 20261014000000_phase04_organization |
+| `ck_ideas__title_not_blank` | CHECK | ideas | 20261014000000_phase04_organization |
+| `ck_ideas__version` | CHECK | ideas | 20261014000000_phase04_organization |
+| `ux_ideas__client_capture` | index unique partiel | ideas | 20261014000000_phase04_organization |
+| `ix_ideas__user_captured` | index partiel | ideas | 20261014000000_phase04_organization |
+| `ix_ideas__user_status` | index partiel | ideas | 20261014000000_phase04_organization |
+| `ix_ideas__title_trgm` | index GIN trigramme | ideas | 20261014000000_phase04_organization |
+| `ix_ideas__converted_project` | index partiel | ideas | 20261014000000_phase04_organization |
+| `ck_projects__slug_format` | CHECK | projects | 20261014000000_phase04_organization |
+| `ck_projects__dates` | CHECK | projects | 20261014000000_phase04_organization |
+| `ck_projects__completed` | CHECK | projects | 20261014000000_phase04_organization |
+| `ck_projects__color` | CHECK | projects | 20261014000000_phase04_organization |
+| `ck_projects__version` | CHECK | projects | 20261014000000_phase04_organization |
+| `ux_projects__slug` | index unique partiel | projects | 20261014000000_phase04_organization |
+| `ix_projects__user_status` | index partiel | projects | 20261014000000_phase04_organization |
+| `ck_tasks__done` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ck_tasks__due` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ck_tasks__not_own_parent` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ck_tasks__series` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ck_tasks__minutes` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ck_tasks__recurrence_complete` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ck_tasks__recurrence_syntax` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ck_tasks__description_len` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ck_tasks__title_not_blank` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ck_tasks__version` | CHECK | tasks | 20261014000000_phase04_organization |
+| `ux_tasks__client_capture` | index unique partiel | tasks | 20261014000000_phase04_organization |
+| `ux_tasks__series_occurrence` | index unique partiel | tasks | 20261014000000_phase04_organization |
+| `ix_tasks__project` | index partiel | tasks | 20261014000000_phase04_organization |
+| `ix_tasks__parent` | index partiel | tasks | 20261014000000_phase04_organization |
+| `ix_tasks__next_occurrence` | index partiel | tasks | 20261014000000_phase04_organization |
+| `ck_task_dependencies__not_self` | CHECK | task_dependencies | 20261014000000_phase04_organization |
+| `orbit_task_dependencies_no_cycle()` | fonction | — | 20261014000000_phase04_organization |
+| `trg_task_dependencies__no_cycle` | déclencheur (verrou consultatif par utilisateur) | task_dependencies | 20261014000000_phase04_organization |
+| `ck_tags__name_len` | CHECK | tags | 20261014000000_phase04_organization |
+| `ck_tags__color` | CHECK | tags | 20261014000000_phase04_organization |
+| `ck_notes__content_len` | CHECK | notes | 20261014000000_phase04_organization |
+| `ck_notes__version` | CHECK | notes | 20261014000000_phase04_organization |
+| `ux_notes__client_capture` | index unique partiel | notes | 20261014000000_phase04_organization |
+| `ix_notes__user_updated` | index partiel | notes | 20261014000000_phase04_organization |
+| `ix_notes__pinned` | index partiel | notes | 20261014000000_phase04_organization |
+| `ck_note_links__one_target` | CHECK | note_links | 20261014000000_phase04_organization |
+| `ux_note_links__idea` | index unique partiel | note_links | 20261014000000_phase04_organization |
+| `ux_note_links__project` | index unique partiel | note_links | 20261014000000_phase04_organization |
+| `ux_note_links__task` | index unique partiel | note_links | 20261014000000_phase04_organization |
+| `ix_tasks__open_due` | index partiel (tâches ouvertes, remplace `ix_tasks__user_status_due`) | tasks | 20261014000100_phase04_review_fixes |
+| `ix_tasks__idea` | index partiel (FK `idea_id`) | tasks | 20261014000100_phase04_review_fixes |
+| `ix_tasks__project_fk` | index partiel (FK `project_id`) | tasks | 20261014000100_phase04_review_fixes |
+| `orbit_task_dependencies_no_cycle()` : `search_path` figé | fonction | — | 20261014000100_phase04_review_fixes |
+
+`prisma migrate diff` signale toujours deux écarts attendus : les index BRIN (Prisma ne les modélise pas avec un nom fixe) et les trois FK `SET NULL (colonne)` (Prisma ne connaît que `SET NULL` sur toutes les colonnes, ce qui effacerait `user_id`). Toute migration générée doit être relue pour retirer les `DROP INDEX …_brin` et la réécriture de ces FK.
