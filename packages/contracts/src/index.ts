@@ -21,3 +21,4 @@ export * from './organization/projects.schema';
 export * from './organization/recurrence';
 export * from './organization/tags.schema';
 export * from './organization/tasks.schema';
+export * from './finance';

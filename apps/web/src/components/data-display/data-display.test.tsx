@@ -42,7 +42,7 @@ describe('MoneyAmount', () => {
   });
 
   it('shows an unknown currency raw', () => {
-    render(<MoneyAmount minor="5000" currency="GBP" />);
+    render(<MoneyAmount minor="5000" currency="XYZ" />);
 
     expect(screen.getByText('5000')).toBeInTheDocument();
   });

@@ -32,5 +32,22 @@ export const PositiveMoneyStringSchema = z
   .refine(isAtMostMaxEntered, 'Montant trop élevé.');
 
 /** Devises prises en charge (ISO 4217), alignées sur `@orbit/money` (test de contrat). */
-export const CurrencyCodeSchema = z.enum(['XOF', 'EUR', 'USD']);
+export const CurrencyCodeSchema = z.enum([
+  'XOF',
+  'XAF',
+  'EUR',
+  'USD',
+  'GBP',
+  'CAD',
+  'CHF',
+  'MAD',
+  'GMD',
+  'GNF',
+  'MRU',
+  'NGN',
+  'GHS',
+  'CNY',
+  'AED',
+  'SAR',
+]);
 export type CurrencyCodeValue = z.infer<typeof CurrencyCodeSchema>;

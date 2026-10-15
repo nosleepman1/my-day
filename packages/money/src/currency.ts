@@ -6,8 +6,21 @@ import { MoneyError } from './errors';
  */
 export const CURRENCIES = {
   XOF: { exponent: 0, symbol: 'FCFA' },
+  XAF: { exponent: 0, symbol: 'FCFA' },
   EUR: { exponent: 2, symbol: '€' },
   USD: { exponent: 2, symbol: '$' },
+  GBP: { exponent: 2, symbol: '£' },
+  CAD: { exponent: 2, symbol: 'CA$' },
+  CHF: { exponent: 2, symbol: 'CHF' },
+  MAD: { exponent: 2, symbol: 'MAD' },
+  GMD: { exponent: 2, symbol: 'D' },
+  GNF: { exponent: 0, symbol: 'FG' },
+  MRU: { exponent: 2, symbol: 'MRU' },
+  NGN: { exponent: 2, symbol: '₦' },
+  GHS: { exponent: 2, symbol: 'GH₵' },
+  CNY: { exponent: 2, symbol: '¥' },
+  AED: { exponent: 2, symbol: 'AED' },
+  SAR: { exponent: 2, symbol: 'SAR' },
 } as const satisfies Record<string, { readonly exponent: number; readonly symbol: string }>;
 
 export type CurrencyCode = keyof typeof CURRENCIES;
