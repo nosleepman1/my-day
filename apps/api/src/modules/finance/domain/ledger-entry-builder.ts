@@ -63,9 +63,12 @@ export function buildStandardLedgerEntries(input: StandardTransactionInput): rea
 
   switch (input.type) {
     case 'INCOME':
+    case 'BORROWING':
+    case 'REFUND':
       direction = 'CREDIT';
       break;
     case 'EXPENSE':
+    case 'LOAN':
       direction = 'DEBIT';
       break;
     case 'ADJUSTMENT':

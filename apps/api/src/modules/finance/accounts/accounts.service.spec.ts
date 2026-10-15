@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { AuditService } from '../../../platform/audit/audit.service';
 import { DomainError } from '../../../platform/errors/domain-error';
 import type { FinanceContext } from '../shared/finance-context';
 
@@ -23,6 +24,9 @@ describe('AccountsService', () => {
     list: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     getBalance: ReturnType<typeof vi.fn>;
+  };
+  let mockAudit: {
+    record: ReturnType<typeof vi.fn>;
   };
 
   const sampleAccount = {
@@ -61,9 +65,14 @@ describe('AccountsService', () => {
       getBalance: vi.fn().mockResolvedValue({ realisedMinor: 100_000n, projectedMinor: 100_000n }),
     };
 
+    mockAudit = {
+      record: vi.fn().mockResolvedValue(undefined),
+    };
+
     service = new AccountsService(
       mockCtx as unknown as FinanceContext,
       mockRepo as unknown as AccountsRepository,
+      mockAudit as unknown as AuditService,
     );
   });
 
@@ -84,6 +93,13 @@ describe('AccountsService', () => {
           userId: USER_1,
           name: 'Compte Courant',
           openingBalanceMinor: 100_000n,
+        }),
+      );
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'finance.account.create',
+          userId: USER_1,
+          entityId: ACCOUNT_1,
         }),
       );
     });
@@ -133,6 +149,13 @@ describe('AccountsService', () => {
       });
 
       expect(res.name).toBe('Compte Courant Modifié');
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'finance.account.update',
+          userId: USER_1,
+          entityId: ACCOUNT_1,
+        }),
+      );
     });
 
     it('rejects update if account is archived', async () => {
@@ -172,6 +195,13 @@ describe('AccountsService', () => {
         ACCOUNT_1,
         expect.objectContaining({ archivedAt: expect.any(Date) }),
       );
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'finance.account.close',
+          userId: USER_1,
+          entityId: ACCOUNT_1,
+        }),
+      );
     });
 
     it('rejects closing an already archived account', async () => {
@@ -195,6 +225,13 @@ describe('AccountsService', () => {
 
       const res = await service.reopen(ACCOUNT_1);
       expect(res.archivedAt).toBeNull();
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'finance.account.reopen',
+          userId: USER_1,
+          entityId: ACCOUNT_1,
+        }),
+      );
     });
 
     it('rejects reopening an account that is not archived', async () => {

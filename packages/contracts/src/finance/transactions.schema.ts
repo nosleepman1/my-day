@@ -8,7 +8,15 @@ import { optionalText, text } from '../organization/common';
 
 import { EconomicClassSchema } from './categories.schema';
 
-export const TRANSACTION_TYPES = ['INCOME', 'EXPENSE', 'TRANSFER', 'ADJUSTMENT'] as const;
+export const TRANSACTION_TYPES = [
+  'INCOME',
+  'EXPENSE',
+  'TRANSFER',
+  'ADJUSTMENT',
+  'BORROWING',
+  'LOAN',
+  'REFUND',
+] as const;
 export const TransactionTypeSchema = z.enum(TRANSACTION_TYPES);
 export type TransactionType = z.infer<typeof TransactionTypeSchema>;
 
@@ -16,7 +24,14 @@ export const TRANSACTION_STATUSES = ['PENDING', 'VALIDATED', 'CANCELLED'] as con
 export const TransactionStatusSchema = z.enum(TRANSACTION_STATUSES);
 export type TransactionStatus = z.infer<typeof TransactionStatusSchema>;
 
-export const TRANSACTION_SOURCES = ['MANUAL', 'RECURRING', 'IMPORT_CSV', 'IMPORT_API'] as const;
+export const TRANSACTION_SOURCES = [
+  'MANUAL',
+  'RECURRENCE',
+  'AUTOMATION',
+  'AI',
+  'IMPORT',
+  'INTEGRATION',
+] as const;
 export const TransactionSourceSchema = z.enum(TRANSACTION_SOURCES);
 export type TransactionSource = z.infer<typeof TransactionSourceSchema>;
 
@@ -37,7 +52,7 @@ export type LedgerEntryResponse = z.infer<typeof LedgerEntryResponseSchema>;
 
 export const CreateTransactionSchema = z
   .object({
-    type: z.enum(['INCOME', 'EXPENSE', 'ADJUSTMENT']),
+    type: z.enum(['INCOME', 'EXPENSE', 'ADJUSTMENT', 'BORROWING', 'LOAN', 'REFUND']),
     status: z.enum(['PENDING', 'VALIDATED']).default('VALIDATED'),
     accountId: z.uuid(),
     amountMinor: PositiveMoneyStringSchema,

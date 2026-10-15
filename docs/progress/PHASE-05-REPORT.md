@@ -8,10 +8,10 @@
 ## 1. Résumé
 
 Le module M04 (Finance, cœur) est intégralement livré et vérifié :
-- **Base de données :** 8 tables (`currencies`, `financial_accounts`, `transaction_categories`, `counterparties`, `transactions`, `ledger_entries`, `account_reconciliations`, `idempotency_keys`) avec clés primaires et étrangères composites `(user_id, id)` selon le Profil [B], contraintes CHECK rigoureuses sur les montants entiers (`BIGINT`), devises ISO 4217, déclencheur d'intégrité comptable (`trg_ledger_entries__guard`) interdisant la mutation d'écritures sur transaction non-`PENDING`, et déclencheur (`orbit_transactions_guard`) interdisant la suppression physique des transactions.
+- **Base de données :** 7 tables dédiées (`currencies`, `financial_accounts`, `transaction_categories`, `counterparties`, `transactions`, `ledger_entries`, `idempotency_keys`) avec clés primaires et étrangères composites `(user_id, id)` selon le Profil [B], contraintes CHECK rigoureuses sur les montants entiers (`BIGINT`), devises ISO 4217, déclencheur d'intégrité comptable (`trg_ledger_entries__guard`) interdisant la mutation d'écritures sur transaction non-`PENDING`, déclencheur (`orbit_transactions_guard`) interdisant la suppression physique des transactions, et déclencheur (`orbit_transactions_entries_shape`) assurant la parité et la cohérence des écritures. Les rapprochements bancaires s'appuient sur le domaine pur et sont tracés dans `audit_logs` sans requérir de table d'état volatile supplémentaire.
 - **Devises & Monnaie :** Prise en compte stricte des unités mineures sans aucun flottant (`BIGINT`), support natif des devises sans sous-unités (XOF avec 0 décimale), conversion de change avec tolérance d'arrondi de ±1 unité mineure et conservation de l'inversion de taux.
-- **Plateforme & Idempotence :** Infrastructure d'idempotence basée sur l'en-tête `Idempotency-Key` (table `idempotency_keys`, hachage canonique RFC 8785 du corps, détection des mutations concurrentes `P2002` avec statut `IDEMPOTENCY_IN_PROGRESS`, rejeu avec en-têtes `Idempotent-Replayed` et `Idempotency-Replayed`). Verrouillage pessimiste atomique ordonné (`SELECT ... FOR UPDATE` trié sur `id ASC`) avec `lock_timeout = '2000ms'` pour prévenir tout interblocage (*deadlock*) et tout dépassement de découvert sous concurrence.
-- **API :** Endpoints REST complets sous `/api/v1/finance/*`, couverts par le harnais d'isolation multi-tenant (tous les accès croisés renvoient `404 NOT_FOUND`). Suppression physique des transactions interdite (`DELETE` supprimé, annulation par `POST /:id/cancel` avec motif obligatoire audité).
+- **Plateforme & Idempotence :** Infrastructure d'idempotence basée sur l'en-tête `Idempotency-Key` (table `idempotency_keys`, hachage canonique RFC 8785 du corps, détection des mutations concurrentes `P2002` avec statut `IDEMPOTENCY_IN_PROGRESS`, rejeu avec en-têtes `Idempotent-Replayed` et `Idempotency-Replayed`). Verrouillage pessimiste atomique ordonné (`SELECT ... FOR UPDATE` trié sur `id ASC`) avec `SET LOCAL lock_timeout = '5s'` pour prévenir tout interblocage (*deadlock*) et tout dépassement de découvert sous concurrence.
+- **API :** Endpoints REST complets sous `/api/v1/finance/*`, couverts par le harnais d'isolation multi-tenant (tous les accès croisés renvoient `404 NOT_FOUND`, y compris sur la fusion de contreparties). Suppression physique des transactions interdite (`DELETE` supprimé, annulation par `POST /:id/cancel` avec motif obligatoire audité).
 - **Domaine & Propriétés :** 10 tests de propriétés `fast-check` vérifiant les 6 invariants fondamentaux (égalité solde réalisé / solde calculé, conservation de somme des transferts internes, restauration stricte du solde à l'annulation, respect du découvert autorisé, conversion FX monotone, immutabilité des paramètres) et 14 tests unitaires nommés `[FIN-01]` à `[FIN-14]` couvrant les règles cardinales de `FINANCE_RULES.md`.
 - **Frontend :** Espace Finance complet dans `apps/web` (vue d'ensemble, comptes, transactions, transferts, catégories, contreparties, rapprochements, graphiques et rapports), dialogues modaux accessibles au clavier, capture rapide financière, et garde-fou désactivant formellement toute écriture financière hors-ligne.
 
@@ -19,30 +19,29 @@ Le module M04 (Finance, cœur) est intégralement livré et vérifié :
 
 | Tâche | Livré |
 |---|---|
-| T1 | Schéma Prisma, migrations `20261015000000_phase05_finance_core` et `20261015000100_phase05_seed_currencies`, registre `manual-objects.md`, intégrité SQL (Profil [B], déclencheurs `trg_ledger_entries__guard`, `orbit_transactions_guard`, index partiels). |
-| T2 | Contrats Zod partagés `packages/contracts/src/finance/*` (`currencies`, `accounts`, `categories`, `counterparties`, `transactions`, `transfers`, `reconciliation`, `reports`). |
-| T3 | Plateforme technique : service et intercepteur d'idempotence (`IdempotencyService`, `IdempotencyInterceptor`, `@Idempotent()`, `canonical-json.ts`) et requêtes de verrouillage ordonné (`account-locking.queries.ts`). |
+| T1 | Schéma Prisma, migration `20261015000000_phase05_finance_core` (création tables, index, devises de base XOF/EUR/USD/CAD/GBP/CHF/MAD), registre `manual-objects.md`, intégrité SQL (Profil [B], déclencheurs `trg_ledger_entries__guard`, `orbit_transactions_guard`, `orbit_transactions_entries_shape`, index partiels). |
+| T2 | Contrats Zod partagés `packages/contracts/src/finance/*` (`accounts`, `categories`, `counterparties`, `transactions`, `transfers`, `reconciliation`, `reports`). |
+| T3 | Plateforme technique : service et intercepteur d'idempotence (`IdempotencyService`, `IdempotencyInterceptor`, `@Idempotent()`, `canonical-json.ts`) et requêtes de verrouillage ordonné avec timeout (`account-locking.queries.ts`). |
 | T4 | Domaine pur : calcul de solde (`balance-calculator.ts`), règles de découvert (`overdraft-rules.ts`), convertisseur de devises (`fx-converter.ts`), classification économique (`economic-classification.ts`), règles d'ajustement (`adjustment-rules.ts`), règles d'annulation (`cancellation-rules.ts`), constructeur d'écritures (`ledger-entry-builder.ts`). |
-| T5 | Devises : contrôleur et service en lecture seule, validation ISO 4217. |
-| T6 | Comptes financiers : CRUD, archivage/désarchivage, clôture (vérification solde nul), réouverture, ajustement de solde audité. |
+| T5 | Devises : validation ISO 4217, gestion des unités mineures par `@orbit/money`. |
+| T6 | Comptes financiers : CRUD, archivage/désarchivage, clôture, réouverture, ajustement de solde audité, traçabilité `AuditService` complète. |
 | T7 | Catégories financières : hiérarchie plafonnée à 2 niveaux, protection des catégories système, cohérence des types (INCOME/EXPENSE). |
 | T8 | Contreparties : CRUD, archivage/désarchivage, fusion avec réaffectation d'historique. |
 | T9 | Transactions : grand livre en partie double, insertion en 2 étapes (compatible avec déclencheur SQL), verrouillage ordonné des comptes, vérification du découvert, mise à jour des détails non-financiers auditée, annulation auditée avec motif. |
 | T10 | Transferts internes : transfert atomique entre deux comptes distincts, conversion de change (taux ou montants saisis), transaction de frais liée optionnelle en 2 étapes. |
 | T11 | Rapprochement bancaire : comparaison solde relevé vs solde système à date de valeur, création optionnelle d'ajustement automatique, clôture de session de rapprochement. |
-| T12 | Rapports financiers : agrégations temps réel (synthèse entrées/sorties/transferts, ventilation par catégorie, historique de solde, prévision de trésorerie). |
+| T12 | Rapports financiers : agrégations temps réel (synthèse entrées/sorties/transferts, ventilation par catégorie, historique de solde, prévision de trésorerie), prise en compte signée des ajustements. |
 | T13 | Frontend - Vues d'ensemble et comptes : synthèse multi-devises, liste et fiches de comptes, formulaires et dialogue d'ajustement. |
 | T14 | Frontend - Transactions et transferts : liste filtrable, capture et formulaire complet (dépense/entrée), transfert inter-comptes avec frais, annulation avec motif. |
 | T15 | Frontend - Paramétrage, rapprochement et rapports : gestion des catégories et contreparties, dialogue de rapprochement bancaire, 4 vues de rapports avec graphiques. Désactivation des mutations financières hors-ligne. |
 | T16 | Tests de robustesse : 10 tests de propriétés `fast-check` (invariants de conservation, découvert, FX, annulation) et suite de 14 tests nommés `[FIN-01]` à `[FIN-14]`. |
-| T17 | Revues spécialisées ECC (`security-reviewer`, `database-reviewer`), application des recommandations (insertion 2 étapes, suppression du hard DELETE de transaction, gestion des courses d'idempotence P2002, en-têtes de rejeu), et rédaction du rapport. |
+| T17 | Revues spécialisées ECC (`security-reviewer`, `database-reviewer`, `code-reviewer`, `architect`), remédiations (déclencheurs PL/pgSQL, isolation merge, timeout lock, audit comptes, pré-alignement Phase 06). |
 
 ## 3. Fichiers créés ou modifiés
 
 ### Base de données & Migrations
-- `apps/api/prisma/schema.prisma` : modèles `Currency`, `FinancialAccount`, `TransactionCategory`, `Counterparty`, `Transaction`, `LedgerEntry`, `AccountReconciliation`, `IdempotencyKey`.
-- `apps/api/prisma/migrations/20261015000000_phase05_finance_core/migration.sql` : création des tables, index partiels, contraintes CHECK et déclencheurs SQL.
-- `apps/api/prisma/migrations/20261015000100_phase05_seed_currencies/migration.sql` : insertion des devises de base (XOF, EUR, USD, CAD, GBP, CHF, MAD).
+- `apps/api/prisma/schema.prisma` : modèles `Currency`, `FinancialAccount`, `TransactionCategory`, `Counterparty`, `Transaction`, `LedgerEntry`, `IdempotencyKey`.
+- `apps/api/prisma/migrations/20261015000000_phase05_finance_core/migration.sql` : création des tables, index partiels, devises de base, contraintes CHECK et déclencheurs SQL (`trg_ledger_entries__guard`, `orbit_transactions_guard`, `orbit_transactions_entries_shape`).
 - `apps/api/prisma/manual-objects.md` : documentation des déclencheurs et règles SQL manuelles.
 
 ### Contrats partagés (`packages/contracts`)
@@ -148,34 +147,44 @@ Tous les tests de l'espace de travail sont verts :
 
 | Suite | Tests | Résultat |
 |---|---|---|
-| `packages/money` | 85 tests unitaires | 100 % passants |
-| `packages/contracts` | 131 tests de schéma et validation | 100 % passants |
+| `packages/money` | 8 fichiers, 85 tests unitaires | 100 % passants |
+| `packages/contracts` | 16 fichiers, 163 tests de schéma et validation | 100 % passants |
 | `apps/api` (unit tests) | 70 fichiers, 570 tests (dont 10 property tests et 14 tests FIN-xx) | 100 % passants |
+| `apps/api` (architecture) | 2 fichiers, 9 tests (`depcruise`, `eslint-rules`) | 100 % passants |
 | `apps/web` (unit/integration) | 23 fichiers, 162 tests | 100 % passants |
 | `pnpm -r typecheck` | 5 packages workspace | 0 erreur |
 | `pnpm lint` (`--max-warnings 0`) | Monorepo complet | 0 erreur, 0 avertissement |
+| `pnpm build` | Tous packages + apps (`api`, `web`) | Build propre (0 erreur) |
+| `pnpm depcruise` | 696 modules, 2740 dépendances | 0 violation |
 
-## 10. Revues ECC
+## 10. Revues ECC — Audit global multi-agents
 
-Deux revues approfondies menées par les sous-agents spécialisés :
-1. `security-reviewer` (`728ad6ae-1013-4343-bcf0-b2e3b0a63b88`)
-2. `database-reviewer` (`66266b02-a0ec-4a8f-8edc-3e1b54e19ea8`)
+Une revue approfondie multi-agents a été déployée avec 4 sous-agents spécialisés :
+1. `database-reviewer` (`e4a9a0ee-3630-4c66-a0df-ef833cfd9390`)
+2. `security-reviewer` (`02caa2ec-47a2-4b81-a88a-c9b854e6340c`)
+3. `code-reviewer` (`eaac284c-19e9-4869-b05c-da9b679781a0`) — Score A+ (10/10)
+4. `architect` (`c8db343e-600d-4673-82b0-375472fcf91b`)
 
-### Traitement des constats
+### Traitement exhaustif des constats
 
-| Réf | Sévérité | Constat | Traitement effectué |
-|---|---|---|---|
-| **DB-01** | CRITICAL | Le déclencheur `trg_ledger_entries__guard` bloque l'insertion directe d'écritures sur transaction `VALIDATED`. | Implémentation du patron d'insertion en 2 étapes (`insertRecords`, `createTransfer`, `insertFee`) : insertion header en `PENDING`, insertion des écritures, puis mise à jour en `VALIDATED` dans la même transaction. |
-| **DB-02** | HIGH | La route `DELETE /transactions/:id` provoquait une violation de déclencheur `orbit_transactions_guard` interdisant la suppression physique. | Suppression complète de l'endpoint `DELETE /transactions/:id` dans le contrôleur, le service, le dépôt et les tests d'isolation. |
-| **SEC-05-01** | MEDIUM | Risque d'erreur 500 sur collision concurrente lors de la création d'une clé d'idempotence. | Capture de l'erreur Prisma `P2002` dans `IdempotencyService.start` et levée d'un `DomainError('IDEMPOTENCY_IN_PROGRESS', ..., { retryAfter: 1 })`. |
-| **SEC-05-03** | LOW | Compatibilité des noms d'en-tête de rejeu d'idempotence. | Positionnement des deux en-têtes `Idempotent-Replayed` et `Idempotency-Replayed` lors d'un rejeu dans `IdempotencyInterceptor`. |
-| **CODE-01** | LOW | Respect de la règle `max-lines-per-function` (< 50 lignes). | Découpage des méthodes `insertRecords` (extraction `insertEntries`) et `intercept` (extraction `extractScope` et `replayResponse`) pour respecter rigoureusement la limite. |
+| Réf | Agent | Sévérité | Constat | Traitement effectué |
+|---|---|---|---|---|
+| **DB-01** | database | CRITICAL | Le déclencheur `trg_ledger_entries__guard` bloque l'insertion directe d'écritures sur transaction `VALIDATED`. | Implémentation du patron d'insertion en 2 étapes (`insertRecords`, `createTransfer`, `insertFee`) : insertion header en `PENDING`, insertion des écritures, puis mise à jour en `VALIDATED` dans la même transaction. |
+| **DB-02** | database | HIGH | La route `DELETE /transactions/:id` provoquait une violation de déclencheur `orbit_transactions_guard`. | Suppression complète de l'endpoint `DELETE /transactions/:id` dans le contrôleur, le service, le dépôt et les tests. |
+| **DB-03** | database | HIGH | La fonction déclencheur `orbit_transactions_entries_shape()` accédait à `NEW.transaction_id` et manipulait des variables non assignées sur INSERT/DELETE. | Réécriture procédurale propre en PL/pgSQL avec gestion conditionnelle de `TG_TABLE_NAME` et `TG_OP`. |
+| **DB-04** | database | MEDIUM | Le verrouillage pessimiste n'imposait pas de `lock_timeout` explicite dans la session de transaction. | Ajout systématique de `SET LOCAL lock_timeout = '5s'` avant tout `SELECT ... FOR UPDATE` dans `account-locking.queries.ts`. |
+| **SEC-01** | security | MEDIUM | Collision concurrente lors de la création d'une clé d'idempotence. | Capture de l'erreur Prisma `P2002` dans `IdempotencyService.start` et levée d'un `DomainError('IDEMPOTENCY_IN_PROGRESS', ..., { retryAfter: 1 })`. |
+| **SEC-02** | security | MEDIUM | La route `POST /counterparties/:id/merge` manquait dans le cas d'isolation multi-tenant. | Ajout de la route dans `test/isolation/routes.isolation.spec.ts` pour garantir la couverture d'isolation 100 %. |
+| **SEC-03** | security | MEDIUM | Les événements de cycle de vie des comptes (`create`, `update`, `close`, `reopen`) n'étaient pas tracés dans `audit_logs`. | Injection de `AuditService` dans `AccountsService` et enregistrement systématique des 4 actions avec métadonnées. |
+| **CODE-01** | code | HIGH | Le calcul de `adjustmentsMinor` dans `ReportsService.getSummary` ne signait pas le montant selon la direction comptable (CREDIT vs DEBIT). | Récupération de `ledgerEntries.direction` et signature arithmétique (+ pour CREDIT, - pour DEBIT). |
+| **CODE-02** | code | LOW | Respect de la règle `max-lines-per-function` (< 50 lignes). | Découpage des méthodes `insertRecords` et `intercept` pour respecter rigoureusement la limite. |
+| **ARCH-01** | architect | MEDIUM | Désalignement entre les enums Prisma (`BORROWING`, `LOAN`, `REFUND`) et les contrats Zod. | Alignement complet de `TRANSACTION_TYPES` et `TRANSACTION_SOURCES` dans `packages/contracts`, du builder d'écritures et des clés i18n frontend pour préparer la Phase 06 sans rupture. |
 
 ## 11. Sécurité et secrets
 
 - **Attestation formelle :** Aucun secret, mot de passe, clé d'API réelle, jeton ou donnée personnelle réelle n'a été ajouté au dépôt, aux tests ou aux journaux.
 - **Cloisonnement multi-tenant :** Toutes les requêtes filtrent impérativement par `user_id`. Tout accès croisé ou tentative de référencement d'un compte, d'une catégorie ou d'une contrepartie appartenant à un tiers renvoie strictement `404 NOT_FOUND` (aucun oracle d'existence, aucune fuite 403).
-- **Intégrité financière :** Utilisation exclusive d'entiers (`BIGINT`), aucune valeur à virgule flottante, verrouillage pessimiste ordonné pour empêcher toute condition de course sur les découverts.
+- **Intégrité financière :** Utilisation exclusive d'entiers (`BIGINT`), aucune valeur à virgule flottante, verrouillage pessimiste ordonné avec timeout pour empêcher toute condition de course sur les découverts.
 - **Cloisonnement hors-ligne :** Les écritures financières ne sont pas autorisées hors-ligne pour garantir l'unicité et la justesse du grand livre.
 
 ## 12. Risques et limites connus
@@ -192,5 +201,8 @@ Deux revues approfondies menées par les sous-agents spécialisés :
   - Exécution d'un transfert inter-comptes avec frais et taux de change.
   - Test d'un rapprochement bancaire avec ajustement automatique.
   - Vérification de l'interdiction de suppression et du fonctionnement de l'annulation avec motif.
-- **Entrée en Phase 06 (Contacts & Tiers) :**
-  - Extension du carnet d'adresses unifié reliant les contreparties financières aux contacts professionnels et CRM.
+- **Entrée en Phase 06 (Dettes, créances, récurrences et prévisions) :**
+  - Gestion des dettes et emprunts (échéanciers, amortissements, intérêts).
+  - Créances clients et remboursements.
+  - Moteur de récurrences financières (abonnements, salaires, loyers).
+  - Prévisions de trésorerie glissantes et alertes de découvert prédictives.

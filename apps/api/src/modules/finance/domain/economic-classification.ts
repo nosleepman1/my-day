@@ -9,6 +9,9 @@ const ALLOWED_TREATMENTS: Readonly<Record<TransactionType, ReadonlySet<Treatment
   EXPENSE: new Set(['STANDARD', 'DEBT_REPAYMENT']),
   TRANSFER: new Set(['STANDARD']),
   ADJUSTMENT: new Set(['STANDARD']),
+  BORROWING: new Set(['STANDARD']),
+  LOAN: new Set(['STANDARD']),
+  REFUND: new Set(['STANDARD']),
 };
 
 export function assertAllowedTreatment(type: TransactionType, treatment: TreatmentType): void {
@@ -96,11 +99,21 @@ export function getEconomicImpact(
     case 'EXPENSE':
       return getExpenseImpact(treatment, amountMinor);
     case 'TRANSFER':
+    case 'BORROWING':
+    case 'LOAN':
+    case 'REFUND':
       return { incomeImpactMinor: 0n, expenseImpactMinor: 0n, netPositionImpactMinor: 0n };
     case 'ADJUSTMENT':
       return getAdjustmentImpact(amountMinor, direction);
   }
 }
+
+const DIRECT_ECONOMIC_CLASSES: Readonly<Partial<Record<TransactionType, EconomicClass>>> = {
+  BORROWING: 'DEBT_DRAWDOWN',
+  LOAN: 'LOAN_DISBURSEMENT',
+  REFUND: 'REFUND_RECEIVED',
+  ADJUSTMENT: 'BALANCE_ADJUSTMENT',
+};
 
 /**
  * Détermine la classe économique par défaut à partir du type et du traitement.
@@ -113,6 +126,10 @@ export function resolveEconomicClass(
   if (categoryDefaultClass) {
     return categoryDefaultClass;
   }
+  const direct = DIRECT_ECONOMIC_CLASSES[type];
+  if (direct) {
+    return direct;
+  }
   if (type === 'TRANSFER' || treatment === 'CUSTOMER_CREDIT') {
     return 'INTERNAL_TRANSFER';
   }
@@ -122,9 +139,5 @@ export function resolveEconomicClass(
   if (type === 'INCOME') {
     return treatment === 'GIFT' ? 'GIFT_RECEIVED' : 'INCOME_OPERATING';
   }
-  if (type === 'EXPENSE') {
-    return treatment === 'GIFT' ? 'GIFT_GIVEN' : 'EXPENSE_OPERATING';
-  }
-  // ADJUSTMENT
-  return 'BALANCE_ADJUSTMENT';
+  return treatment === 'GIFT' ? 'GIFT_GIVEN' : 'EXPENSE_OPERATING';
 }

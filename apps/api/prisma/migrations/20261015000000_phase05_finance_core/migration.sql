@@ -308,7 +308,7 @@ BEGIN
         RAISE EXCEPTION 'financial_accounts currency is immutable' USING ERRCODE = '23514';
     END IF;
     IF NEW.opening_balance_minor <> OLD.opening_balance_minor THEN
-        IF EXISTS (SELECT 1 FROM ledger_entries WHERE account_id = OLD.id) THEN
+        IF EXISTS (SELECT 1 FROM ledger_entries WHERE user_id = OLD.user_id AND account_id = OLD.id) THEN
             RAISE EXCEPTION 'financial_accounts opening_balance_minor is immutable once ledger entries exist' USING ERRCODE = '23514';
         END IF;
     END IF;
@@ -464,6 +464,7 @@ CREATE TRIGGER "trg_ledger_entries__guard"
 CREATE OR REPLACE FUNCTION orbit_transactions_entries_shape() RETURNS trigger
     LANGUAGE plpgsql AS $$
 DECLARE
+    v_tx_id UUID;
     v_tx_record RECORD;
     v_debit_count INT;
     v_credit_count INT;
@@ -472,91 +473,106 @@ DECLARE
     v_debit_entry RECORD;
     v_credit_entry RECORD;
 BEGIN
-    FOR v_tx_record IN
-        SELECT DISTINCT t.id, t.type, t.amount_minor, t.currency, t.rate
-        FROM transactions t
-        WHERE t.id IN (
-            SELECT CASE WHEN TG_TABLE_NAME = 'transactions' THEN id ELSE transaction_id END
-            FROM (SELECT NEW.id AS id, NEW.transaction_id AS transaction_id
-                  UNION
-                  SELECT OLD.id AS id, OLD.transaction_id AS transaction_id) touched
-            WHERE id IS NOT NULL OR transaction_id IS NOT NULL
-        )
-    LOOP
-        SELECT
-            COUNT(*) AS total_count,
-            COUNT(*) FILTER (WHERE direction = 'DEBIT') AS debit_cnt,
-            COUNT(*) FILTER (WHERE direction = 'CREDIT') AS credit_cnt
-        INTO v_total_entries, v_debit_count, v_credit_count
-        FROM ledger_entries
-        WHERE transaction_id = v_tx_record.id;
+    IF TG_TABLE_NAME = 'transactions' THEN
+        IF TG_OP = 'DELETE' THEN
+            v_tx_id := OLD.id;
+        ELSE
+            v_tx_id := NEW.id;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'ledger_entries' THEN
+        IF TG_OP = 'DELETE' THEN
+            v_tx_id := OLD.transaction_id;
+        ELSE
+            v_tx_id := NEW.transaction_id;
+        END IF;
+    END IF;
 
-        CASE v_tx_record.type
-            WHEN 'INCOME', 'BORROWING' THEN
-                IF v_total_entries <> 1 OR v_credit_count <> 1 THEN
-                    RAISE EXCEPTION 'transaction % requires exactly 1 CREDIT ledger entry', v_tx_record.type
-                        USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                END IF;
-                SELECT * INTO v_single_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id;
-                IF v_single_entry.amount_minor <> v_tx_record.amount_minor OR v_single_entry.currency <> v_tx_record.currency THEN
-                    RAISE EXCEPTION 'entry amount and currency must match transaction header'
-                        USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                END IF;
+    IF v_tx_id IS NULL THEN
+        RETURN NULL;
+    END IF;
 
-            WHEN 'EXPENSE', 'LOAN' THEN
-                IF v_total_entries <> 1 OR v_debit_count <> 1 THEN
-                    RAISE EXCEPTION 'transaction % requires exactly 1 DEBIT ledger entry', v_tx_record.type
-                        USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                END IF;
-                SELECT * INTO v_single_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id;
-                IF v_single_entry.amount_minor <> v_tx_record.amount_minor OR v_single_entry.currency <> v_tx_record.currency THEN
-                    RAISE EXCEPTION 'entry amount and currency must match transaction header'
-                        USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                END IF;
+    SELECT t.id, t.type, t.amount_minor, t.currency, t.rate
+      INTO v_tx_record
+      FROM transactions t
+     WHERE t.id = v_tx_id;
 
-            WHEN 'TRANSFER' THEN
-                IF v_total_entries <> 2 OR v_debit_count <> 1 OR v_credit_count <> 1 THEN
-                    RAISE EXCEPTION 'TRANSFER requires exactly 1 DEBIT and 1 CREDIT entry'
-                        USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                END IF;
-                SELECT * INTO v_debit_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id AND direction = 'DEBIT';
-                SELECT * INTO v_credit_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id AND direction = 'CREDIT';
-                IF v_debit_entry.account_id = v_credit_entry.account_id THEN
-                    RAISE EXCEPTION 'TRANSFER requires two distinct accounts'
-                        USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                END IF;
-                IF v_debit_entry.amount_minor <> v_tx_record.amount_minor OR v_debit_entry.currency <> v_tx_record.currency THEN
-                    RAISE EXCEPTION 'debit entry must match transaction amount and currency'
-                        USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                END IF;
-                IF v_debit_entry.currency = v_credit_entry.currency THEN
-                    IF v_tx_record.rate IS NOT NULL THEN
-                        RAISE EXCEPTION 'same-currency TRANSFER must not have rate'
-                            USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                    END IF;
-                    IF v_debit_entry.amount_minor <> v_credit_entry.amount_minor THEN
-                        RAISE EXCEPTION 'same-currency TRANSFER must have identical debit and credit amounts'
-                            USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                    END IF;
-                ELSE
-                    IF v_tx_record.rate IS NULL THEN
-                        RAISE EXCEPTION 'multi-currency TRANSFER requires rate'
-                            USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
-                    END IF;
-                END IF;
+    IF NOT FOUND THEN
+        RETURN NULL;
+    END IF;
 
-            WHEN 'REFUND', 'ADJUSTMENT' THEN
-                IF v_total_entries <> 1 THEN
-                    RAISE EXCEPTION 'transaction % requires exactly 1 ledger entry', v_tx_record.type
+    SELECT
+        COUNT(*) AS total_count,
+        COUNT(*) FILTER (WHERE direction = 'DEBIT') AS debit_cnt,
+        COUNT(*) FILTER (WHERE direction = 'CREDIT') AS credit_cnt
+    INTO v_total_entries, v_debit_count, v_credit_count
+    FROM ledger_entries
+    WHERE transaction_id = v_tx_record.id;
+
+    CASE v_tx_record.type
+        WHEN 'INCOME', 'BORROWING' THEN
+            IF v_total_entries <> 1 OR v_credit_count <> 1 THEN
+                RAISE EXCEPTION 'transaction % requires exactly 1 CREDIT ledger entry', v_tx_record.type
+                    USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+            END IF;
+            SELECT * INTO v_single_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id;
+            IF v_single_entry.amount_minor <> v_tx_record.amount_minor OR v_single_entry.currency <> v_tx_record.currency THEN
+                RAISE EXCEPTION 'entry amount and currency must match transaction header'
+                    USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+            END IF;
+
+        WHEN 'EXPENSE', 'LOAN' THEN
+            IF v_total_entries <> 1 OR v_debit_count <> 1 THEN
+                RAISE EXCEPTION 'transaction % requires exactly 1 DEBIT ledger entry', v_tx_record.type
+                    USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+            END IF;
+            SELECT * INTO v_single_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id;
+            IF v_single_entry.amount_minor <> v_tx_record.amount_minor OR v_single_entry.currency <> v_tx_record.currency THEN
+                RAISE EXCEPTION 'entry amount and currency must match transaction header'
+                    USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+            END IF;
+
+        WHEN 'TRANSFER' THEN
+            IF v_total_entries <> 2 OR v_debit_count <> 1 OR v_credit_count <> 1 THEN
+                RAISE EXCEPTION 'TRANSFER requires exactly 1 DEBIT and 1 CREDIT entry'
+                    USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+            END IF;
+            SELECT * INTO v_debit_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id AND direction = 'DEBIT';
+            SELECT * INTO v_credit_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id AND direction = 'CREDIT';
+            IF v_debit_entry.account_id = v_credit_entry.account_id THEN
+                RAISE EXCEPTION 'TRANSFER requires two distinct accounts'
+                    USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+            END IF;
+            IF v_debit_entry.amount_minor <> v_tx_record.amount_minor OR v_debit_entry.currency <> v_tx_record.currency THEN
+                RAISE EXCEPTION 'debit entry must match transaction amount and currency'
+                    USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+            END IF;
+            IF v_debit_entry.currency = v_credit_entry.currency THEN
+                IF v_tx_record.rate IS NOT NULL THEN
+                    RAISE EXCEPTION 'same-currency TRANSFER must not have rate'
                         USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
                 END IF;
-                SELECT * INTO v_single_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id;
-                IF v_single_entry.amount_minor <> v_tx_record.amount_minor OR v_single_entry.currency <> v_tx_record.currency THEN
-                    RAISE EXCEPTION 'entry amount and currency must match transaction header'
+                IF v_debit_entry.amount_minor <> v_credit_entry.amount_minor THEN
+                    RAISE EXCEPTION 'same-currency TRANSFER must have identical debit and credit amounts'
                         USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
                 END IF;
-        END CASE;
-    END LOOP;
+            ELSE
+                IF v_tx_record.rate IS NULL THEN
+                    RAISE EXCEPTION 'multi-currency TRANSFER requires rate'
+                        USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+                END IF;
+            END IF;
+
+        WHEN 'REFUND', 'ADJUSTMENT' THEN
+            IF v_total_entries <> 1 THEN
+                RAISE EXCEPTION 'transaction % requires exactly 1 ledger entry', v_tx_record.type
+                    USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+            END IF;
+            SELECT * INTO v_single_entry FROM ledger_entries WHERE transaction_id = v_tx_record.id;
+            IF v_single_entry.amount_minor <> v_tx_record.amount_minor OR v_single_entry.currency <> v_tx_record.currency THEN
+                RAISE EXCEPTION 'entry amount and currency must match transaction header'
+                    USING ERRCODE = '23514', CONSTRAINT = 'trg_transactions__entries_shape';
+            END IF;
+    END CASE;
 
     RETURN NULL;
 END;

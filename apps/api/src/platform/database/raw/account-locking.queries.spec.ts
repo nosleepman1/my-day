@@ -24,6 +24,7 @@ describe('AccountLockingQueries', () => {
 
   it('locks a single account using SELECT FOR UPDATE with user_id filter', async () => {
     const mockTx = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
       $queryRaw: vi.fn().mockResolvedValue([sampleRow]),
     } as unknown as Prisma.TransactionClient;
 
@@ -34,6 +35,7 @@ describe('AccountLockingQueries', () => {
 
   it('returns null if account not found during lock', async () => {
     const mockTx = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
       $queryRaw: vi.fn().mockResolvedValue([]),
     } as unknown as Prisma.TransactionClient;
 
@@ -43,6 +45,7 @@ describe('AccountLockingQueries', () => {
 
   it('locks multiple accounts in deterministic sorted order to prevent deadlocks', async () => {
     const mockTx = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
       $queryRaw: vi.fn().mockResolvedValue([sampleRow]),
     } as unknown as Prisma.TransactionClient;
 

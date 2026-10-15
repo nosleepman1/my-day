@@ -323,6 +323,13 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       'delete',
       (f) => `/finance/counterparties/${f.counterparty}`,
     ),
+    'POST /api/v1/finance/counterparties/:id/merge': atFinance(
+      'post',
+      (f) => `/finance/counterparties/${f.counterparty}/merge`,
+      {
+        body: () => ({ targetCounterpartyId: SOME_ID }),
+      },
+    ),
     'GET /api/v1/finance/transactions/:id': atFinance('get', (f) => `/finance/transactions/${f.transaction}`),
     'PATCH /api/v1/finance/transactions/:id': atFinance(
       'patch',

@@ -114,7 +114,10 @@
       "INCOME": "Entrée",
       "EXPENSE": "Dépense",
       "TRANSFER": "Transfert",
-      "ADJUSTMENT": "Ajustement"
+      "ADJUSTMENT": "Ajustement",
+      "BORROWING": "Emprunt",
+      "LOAN": "Prêt",
+      "REFUND": "Remboursement"
     },
     "statuses": {
       "PENDING": "En attente",

@@ -8,8 +8,6 @@ import type {
   EconomicClass,
   ListTransactionsQuery,
   TransactionResponse,
-  TransactionSource,
-  TransactionType,
   UpdateTransactionDetails,
 } from '@orbit/contracts';
 import {
@@ -30,14 +28,14 @@ import { TransactionsRepository, type TransactionWithEntries } from './transacti
 export function toTransactionResponse(tx: TransactionWithEntries): TransactionResponse {
   return {
     id: tx.id,
-    type: tx.type as TransactionType,
+    type: tx.type,
     status: tx.status,
     economicClass: tx.economicClass,
     amountMinor: tx.amountMinor.toString(),
     currency: tx.currency as CurrencyCode,
     occurredAt: tx.occurredAt.toISOString(),
     valueDate: tx.valueDate.toISOString().slice(0, 10),
-    source: tx.source as TransactionSource,
+    source: tx.source,
     description: tx.description,
     notes: tx.notes,
     categoryId: tx.categoryId,
@@ -218,7 +216,7 @@ export class TransactionsService {
     }
 
     if (input.categoryId) {
-      await this.references.validateCategory(userId, input.categoryId, existing.type as TransactionType);
+      await this.references.validateCategory(userId, input.categoryId, existing.type);
     }
     if (input.counterpartyId) {
       await this.references.validateCounterparty(userId, input.counterpartyId);

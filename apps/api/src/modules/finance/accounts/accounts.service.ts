@@ -14,6 +14,7 @@ import {
 } from '@orbit/contracts';
 import { assertCurrencyCode } from '@orbit/money';
 
+import { AuditService } from '../../../platform/audit/audit.service';
 import { DomainError } from '../../../platform/errors/domain-error';
 import { defaultMessageOf } from '../../../platform/http/error-mapping';
 import type { CalculatedBalance } from '../domain/balance-calculator';
@@ -75,6 +76,7 @@ export class AccountsService {
   constructor(
     private readonly ctx: FinanceContext,
     private readonly repo: AccountsRepository,
+    private readonly audit: AuditService,
   ) {}
 
   private async assertNameAvailable(
@@ -145,12 +147,19 @@ export class AccountsService {
       notes: dto.notes,
     });
 
-    const initialBalance: CalculatedBalance = {
+    await this.audit.record({
+      action: 'finance.account.create',
+      userId,
+      entityType: 'FinancialAccount',
+      entityId: account.id,
+      outcome: 'SUCCESS',
+      metadata: { name: account.name, currency: account.currency, type: account.type },
+    });
+
+    return toAccountResponse(account, {
       realisedMinor: openingBalance,
       projectedMinor: openingBalance,
-    };
-
-    return toAccountResponse(account, initialBalance);
+    });
   }
 
   async getById(id: string): Promise<AccountResponse> {
@@ -201,6 +210,18 @@ export class AccountsService {
     const updateData = buildAccountUpdateData(dto);
     const updated = await this.repo.update(userId, id, updateData);
 
+    await this.audit.record({
+      action: 'finance.account.update',
+      userId,
+      entityType: 'FinancialAccount',
+      entityId: id,
+      outcome: 'SUCCESS',
+      metadata: {
+        allowOverdraft: dto.allowOverdraft ?? null,
+        overdraftLimitMinor: dto.overdraftLimitMinor ?? null,
+      },
+    });
+
     const currentBalance = await this.repo.getBalance(userId, id);
     return toAccountResponse(
       updated,
@@ -227,6 +248,15 @@ export class AccountsService {
       ...(dto.notes ? { notes: dto.notes } : {}),
     });
 
+    await this.audit.record({
+      action: 'finance.account.close',
+      userId,
+      entityType: 'FinancialAccount',
+      entityId: id,
+      outcome: 'SUCCESS',
+      metadata: { notes: dto.notes ?? null },
+    });
+
     const balance = await this.repo.getBalance(userId, id);
     return toAccountResponse(
       updated,
@@ -248,6 +278,15 @@ export class AccountsService {
     const updated = await this.repo.update(userId, id, {
       archivedAt: null,
       ...(dto.notes ? { notes: dto.notes } : {}),
+    });
+
+    await this.audit.record({
+      action: 'finance.account.reopen',
+      userId,
+      entityType: 'FinancialAccount',
+      entityId: id,
+      outcome: 'SUCCESS',
+      metadata: { notes: dto.notes ?? null },
     });
 
     const balance = await this.repo.getBalance(userId, id);

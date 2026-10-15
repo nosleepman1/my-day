@@ -24,6 +24,7 @@ export class AccountLockingQueries {
     userId: string,
     accountId: string,
   ): Promise<LockedAccountRow | null> {
+    await tx.$executeRaw`SET LOCAL lock_timeout = '5s'`;
     const rows = await tx.$queryRaw<LockedAccountRow[]>`
       SELECT id::text AS id,
              user_id::text AS user_id,
@@ -47,6 +48,7 @@ export class AccountLockingQueries {
     accountIds: readonly string[],
   ): Promise<LockedAccountRow[]> {
     if (accountIds.length === 0) return [];
+    await tx.$executeRaw`SET LOCAL lock_timeout = '5s'`;
     const sortedIds = [...new Set(accountIds)].sort();
     return tx.$queryRaw<LockedAccountRow[]>`
       SELECT id::text AS id,

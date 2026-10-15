@@ -32,6 +32,7 @@ interface RawTxItem {
   readonly economicClass: string;
   readonly amountMinor: bigint;
   readonly valueDate: Date;
+  readonly ledgerEntries?: readonly { readonly direction: string }[];
 }
 
 interface CurrencyAccumulator {
@@ -85,7 +86,12 @@ export class ReportsService {
     } else if (tx.type === 'EXPENSE' || tx.economicClass === 'EXPENSE_FEE') {
       acc.expenseMinor += tx.amountMinor;
     } else if (tx.type === 'ADJUSTMENT') {
-      acc.adjustmentsMinor += tx.amountMinor;
+      const direction = tx.ledgerEntries?.[0]?.direction ?? 'CREDIT';
+      if (direction === 'CREDIT') {
+        acc.adjustmentsMinor += tx.amountMinor;
+      } else {
+        acc.adjustmentsMinor -= tx.amountMinor;
+      }
     }
   }
 
@@ -109,6 +115,9 @@ export class ReportsService {
         economicClass: true,
         amountMinor: true,
         valueDate: true,
+        ledgerEntries: {
+          select: { direction: true },
+        },
       },
     });
 
