@@ -13,6 +13,7 @@ import {
   CreateCounterpartySchema,
   CreateTransactionSchema,
   CancelTransactionSchema,
+  CreateTransferSchema,
   IdParamSchema,
   ListAccountsQuerySchema,
   ListCategoriesQuerySchema,
@@ -22,6 +23,7 @@ import {
   ReopenAccountSchema,
   TransactionEnvelopeSchema,
   TransactionListEnvelopeSchema,
+  TransferEnvelopeSchema,
   UpdateAccountSchema,
   UpdateCategorySchema,
   UpdateCounterpartySchema,
@@ -61,3 +63,6 @@ export class ListTransactionsQueryDto extends createZodDto(ListTransactionsQuery
 
 export class TransactionEnvelopeDto extends createZodDto(TransactionEnvelopeSchema) {}
 export class TransactionListEnvelopeDto extends createZodDto(TransactionListEnvelopeSchema) {}
+
+export class CreateTransferDto extends createZodDto(CreateTransferSchema) {}
+export class TransferEnvelopeDto extends createZodDto(TransferEnvelopeSchema) {}

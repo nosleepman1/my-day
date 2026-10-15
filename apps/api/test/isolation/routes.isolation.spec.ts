@@ -189,12 +189,19 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
     category: string;
     counterparty: string;
     transaction: string;
+    transfer: string;
   }>;
 
   async function financeFixture(owner: SignedInUser): Promise<FinanceFixture> {
     const account = await createAs(owner, '/finance/accounts', {
       name: `Compte ${randomUUID().slice(0, 8)}`,
       type: 'BANK',
+      currency: 'XOF',
+      openedOn: '2026-01-01',
+    });
+    const account2 = await createAs(owner, '/finance/accounts', {
+      name: `Compte Dest ${randomUUID().slice(0, 8)}`,
+      type: 'CASH',
       currency: 'XOF',
       openedOn: '2026-01-01',
     });
@@ -221,7 +228,19 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       },
       { 'Idempotency-Key': randomUUID() },
     );
-    return { account, category, counterparty, transaction };
+    const transfer = await createAs(
+      owner,
+      '/finance/transfers',
+      {
+        fromAccountId: account,
+        toAccountId: account2,
+        fromAmountMinor: '5000',
+        occurredAt: '2026-02-01T10:00:00.000Z',
+        valueDate: '2026-02-01',
+      },
+      { 'Idempotency-Key': randomUUID() },
+    );
+    return { account, category, counterparty, transaction, transfer };
   }
 
   type FinanceCase = Readonly<{
@@ -300,6 +319,7 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       'delete',
       (f) => `/finance/transactions/${f.transaction}`,
     ),
+    'GET /api/v1/finance/transfers/:id': atFinance('get', (f) => `/finance/transfers/${f.transfer}`),
   };
 
   function financeCase(spec: FinanceCase): CrossUserCase {

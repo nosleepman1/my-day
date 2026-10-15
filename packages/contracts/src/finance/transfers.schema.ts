@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { PositiveMoneyStringSchema } from '../common/amount';
+import { CurrencyCodeSchema, PositiveMoneyStringSchema } from '../common/amount';
 import { CivilDateSchema, InstantSchema } from '../common/dates';
 import { dataEnvelope } from '../common/envelope';
 import { optionalText } from '../organization/common';
@@ -18,6 +18,7 @@ export const CreateTransferSchema = z
       .regex(/^\d+(?:\.\d{1,10})?$/, 'Taux de change invalide.')
       .optional(),
     rateDate: CivilDateSchema.optional(),
+    feeMinor: PositiveMoneyStringSchema.optional(),
     occurredAt: InstantSchema,
     valueDate: CivilDateSchema,
     description: optionalText(255).optional(),
@@ -29,11 +30,22 @@ export const CreateTransferSchema = z
     path: ['toAccountId'],
   });
 export type CreateTransfer = z.infer<typeof CreateTransferSchema>;
+export type CreateTransferInput = z.input<typeof CreateTransferSchema>;
 
 export const TransferResponseSchema = z.object({
-  transferId: z.uuid(),
-  fromTransaction: TransactionResponseSchema,
-  toTransaction: TransactionResponseSchema,
+  id: z.uuid(),
+  fromAccountId: z.uuid(),
+  toAccountId: z.uuid(),
+  fromAmountMinor: PositiveMoneyStringSchema,
+  toAmountMinor: PositiveMoneyStringSchema,
+  fromCurrency: CurrencyCodeSchema,
+  toCurrency: CurrencyCodeSchema,
+  exchangeRate: z.string().nullable(),
+  rateDate: CivilDateSchema.nullable(),
+  transaction: TransactionResponseSchema,
+  feeTransaction: TransactionResponseSchema.nullable().optional(),
+  fromTransaction: TransactionResponseSchema.optional(),
+  toTransaction: TransactionResponseSchema.optional(),
 });
 export type TransferResponse = z.infer<typeof TransferResponseSchema>;
 

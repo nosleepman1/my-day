@@ -70,6 +70,12 @@ export class CategoriesRepository {
     });
   }
 
+  async findBySystemKey(userId: string, systemKey: string): Promise<TransactionCategory | null> {
+    return this.ctx.db.transactionCategory.findFirst({
+      where: { userId, systemKey },
+    });
+  }
+
   async findByNameAndParent(
     userId: string,
     name: string,
