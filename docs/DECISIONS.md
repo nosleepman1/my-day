@@ -371,6 +371,33 @@ Si l'ouverture publique (ADR-026) intervient avant PHASE-17 :
 - **Raison :** méthode la plus souple et universelle, sans alourdir le schéma relationnel de la finance.
 - **Conséquences :** aucune table supplémentaire. Le seed sénégalais intègre ces catégories prêtes à l'emploi.
 
+### ADR-045 : Insertion des transactions financières en deux étapes pour conformité avec le déclencheur d'intégrité
+
+- **Statut :** acceptée en PHASE-05.
+- **Date :** 15 octobre 2026.
+- **Contexte :** le déclencheur PostgreSQL `trg_ledger_entries__guard` interdit formellement d'insérer, modifier ou supprimer une écriture de grand livre (`ledger_entries`) sur une transaction dont le statut n'est pas `PENDING` (SQLSTATE `23514`). Or, le client ou l'API souhaite pouvoir créer directement une transaction validée (`VALIDATED`).
+- **Décision :** le dépôt insère systématiquement l'en-tête de transaction en `PENDING` (`validated_at = null`), insère ensuite les écritures de débit/crédit, puis effectue un `UPDATE` vers `VALIDATED` (`validated_at = occurred_at`) au sein de la même transaction SQL. Le même patron s'applique aux transferts avec frais.
+- **Raison :** respect strict de l'invariant d'immuabilité du grand livre au niveau base de données sans sacrifier l'ergonomie de création directe.
+- **Conséquences :** conformité totale avec le déclencheur de la base ; aucune régression possible lors de l'application des migrations réelles.
+
+### ADR-046 : Interdiction absolue de suppression physique des transactions financières
+
+- **Statut :** acceptée en PHASE-05.
+- **Date :** 15 octobre 2026.
+- **Contexte :** le déclencheur PostgreSQL `orbit_transactions_guard` bloque tout `DELETE` sur la table `transactions` afin de garantir l'auditabilité et la traçabilité comptable (`FINANCE_RULES.md` §11.1). Une route `DELETE /finance/transactions/:id` avait initialement été envisagée pour les transactions `PENDING`.
+- **Décision :** interdiction définitive de la suppression physique sur `transactions`. La route `DELETE` est supprimée de l'API. Toute annulation (qu'elle concerne une transaction `PENDING` ou `VALIDATED`) transite par l'action métier explicite `POST /finance/transactions/:id/cancel` avec motif obligatoire audité.
+- **Raison :** principe comptable de non-altération du grand livre et respect du déclencheur SQL.
+- **Conséquences :** API simplifiée et robuste ; traçabilité exhaustive de toutes les intentions de saisie.
+
+### ADR-047 : Détection et gestion de course d'insertion d'idempotence (P2002)
+
+- **Statut :** acceptée en PHASE-05.
+- **Date :** 15 octobre 2026.
+- **Contexte :** deux requêtes concurrentes utilisant la même clé d'idempotence peuvent interroger la base avant que la première n'ait fini d'insérer sa clé `IN_PROGRESS`, déclenchant une violation de contrainte d'unicité Prisma `P2002` sur `(user_id, scope, key)`.
+- **Décision :** `IdempotencyService.start` intercepte l'erreur `P2002` et la transforme en `DomainError('IDEMPOTENCY_IN_PROGRESS')`, renvoyant un statut HTTP `409` propre avec `Retry-After: 1`.
+- **Raison :** évite toute remontée d'erreur 500 interne sur les requêtes concurrentes utilisant une clé identique.
+- **Conséquences :** comportement déterministe et conforme aux standards d'idempotence d'API de paiement (type Stripe).
+
 ---
 
 ## Décisions ouvertes (à trancher au plus tard au démarrage de la phase indiquée)
