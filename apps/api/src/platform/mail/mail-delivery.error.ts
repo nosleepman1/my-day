@@ -17,5 +17,6 @@ export class MailDeliveryError extends Error {
 
 /** Un retour à la ligne dans l'adresse permettrait d'injecter des en-têtes (`Bcc:`…). */
 export function assertSafeRecipient(to: string, template: MailTemplate): void {
-  if (/[\r\n]/.test(to)) throw new MailDeliveryError(template);
+  // Un seul destinataire : ni saut de ligne (injection d'en-tête) ni liste `a@x, b@y` (revue PHASE-03).
+  if (/[\r\n,;]/.test(to)) throw new MailDeliveryError(template);
 }
