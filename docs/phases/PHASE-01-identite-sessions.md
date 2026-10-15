@@ -1,6 +1,6 @@
 # PHASE-01 : Identité et sessions
 
-- **Statut :** À faire
+- **Statut :** Terminée avec réserves (voir `progress/PHASE-01-REPORT.md`)
 - **Dépend de :** PHASE-00
 - **Accès :** Tous
 - **Estimation :** 6 à 8 jours effectifs

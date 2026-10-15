@@ -1,0 +1,100 @@
+{
+  "title": "Paramètres",
+  "tabs": {
+    "profile": "Profil",
+    "preferences": "Préférences",
+    "modules": "Modules",
+    "security": "Sécurité",
+    "tags": "Tags"
+  },
+  "saved": "Modifications enregistrées.",
+  "profile": {
+    "displayName": "Nom affiché",
+    "email": "Adresse e-mail"
+  },
+  "preferences": {
+    "locale": "Langue",
+    "locales": { "fr": "Français", "en": "English (bientôt)" },
+    "timezone": "Fuseau horaire",
+    "timezoneHint": "Tapez pour chercher (ex. : Dakar).",
+    "timezoneInvalid": "Fuseau horaire inconnu.",
+    "deviceZone": "Votre appareil est sur {{device}}, ORBIT utilise {{zone}}.",
+    "currency": "Devise par défaut",
+    "currencies": { "XOF": "Franc CFA (FCFA)", "EUR": "Euro (€)", "USD": "Dollar US ($)" },
+    "dateFormat": "Format de date",
+    "weekStartsOn": "Premier jour de la semaine",
+    "weekdays": { "1": "Lundi", "6": "Samedi", "7": "Dimanche" },
+    "theme": "Thème"
+  },
+  "modules": {
+    "intro": "Les modules désactivés disparaissent de la navigation. Leurs données sont conservées.",
+    "labels": {
+      "ideas": "Idées",
+      "tasks": "Tâches",
+      "projects": "Projets",
+      "notes": "Notes",
+      "finance": "Finances",
+      "debts": "Dettes et créances",
+      "calendar": "Calendrier",
+      "documents": "Documents",
+      "pro": "Pro (clients, factures)",
+      "goals": "Objectifs",
+      "habits": "Habitudes",
+      "learning": "Apprentissage",
+      "journal": "Journal",
+      "automations": "Automatisations",
+      "integrations": "Intégrations",
+      "ai": "Assistant IA"
+    }
+  },
+  "security": {
+    "email": {
+      "title": "Adresse e-mail",
+      "current": "Adresse actuelle : {{email}}",
+      "newEmail": "Nouvelle adresse",
+      "submit": "Changer d'adresse",
+      "done": "Un lien de confirmation a été envoyé à la nouvelle adresse."
+    },
+    "password": {
+      "title": "Mot de passe",
+      "current": "Mot de passe actuel",
+      "submit": "Changer le mot de passe",
+      "done": "Mot de passe changé. Vos autres appareils ont été déconnectés."
+    },
+    "sessions": {
+      "title": "Sessions actives",
+      "current": "Cet appareil",
+      "unknownDevice": "Appareil inconnu",
+      "lastSeen": "Dernière activité : {{date}}",
+      "revoke": "Déconnecter",
+      "revokeLabel": "Déconnecter la session {{device}}",
+      "revokeOthers": "Déconnecter les autres appareils",
+      "empty": "Aucune autre session active."
+    },
+    "history": {
+      "title": "Historique de connexion",
+      "empty": "Aucune connexion enregistrée.",
+      "more": "Afficher plus",
+      "events": {
+        "LOGIN_SUCCEEDED": "Connexion réussie",
+        "LOGIN_FAILED": "Échec de connexion",
+        "LOGOUT": "Déconnexion",
+        "ACCOUNT_LOCKED": "Compte verrouillé temporairement",
+        "PASSWORD_CHANGED": "Mot de passe changé",
+        "PASSWORD_RESET": "Mot de passe réinitialisé",
+        "PASSWORD_RESET_REQUESTED": "Réinitialisation demandée",
+        "REAUTH_SUCCEEDED": "Ré-authentification",
+        "REAUTH_FAILED": "Échec de ré-authentification",
+        "EMAIL_CHANGED": "Adresse e-mail changée",
+        "SESSION_REVOKED": "Session déconnectée",
+        "other": "Événement de sécurité"
+      }
+    }
+  },
+  "reauth": {
+    "title": "Confirmez votre mot de passe",
+    "description": "Cette action est sensible : confirmez votre identité pour continuer.",
+    "password": "Mot de passe",
+    "submit": "Confirmer"
+  }
+}

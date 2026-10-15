@@ -1,11 +1,15 @@
 import { Module } from '@nestjs/common';
 
+import { AdminProvisioningService } from './admin-provisioning.service';
+import { MeController } from './me.controller';
+import { PreferencesRepository } from './preferences.repository';
 import { UsersRepository } from './users.repository';
 import { UsersService } from './users.service';
 
-/** M01 : comptes et préférences (`users`, `user_preferences`). Les routes `/me` arrivent en T10. */
+/** M01 : comptes, profil et préférences (`users`, `user_preferences`) ; routes `/me`. */
 @Module({
-  providers: [UsersRepository, UsersService],
-  exports: [UsersService],
+  controllers: [MeController],
+  providers: [UsersRepository, PreferencesRepository, UsersService, AdminProvisioningService],
+  exports: [UsersService, AdminProvisioningService],
 })
 export class UsersModule {}

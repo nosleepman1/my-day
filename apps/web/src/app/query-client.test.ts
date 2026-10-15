@@ -21,3 +21,23 @@ describe('query retry policy (FRONTEND.md §3.4)', () => {
     expect(createQueryClient().getDefaultOptions().mutations?.retry).toBe(false);
   });
 });
+
+describe('global 401 handling', () => {
+  async function failWith(error: ApiError): Promise<number> {
+    let calls = 0;
+    const client = createQueryClient({
+      onUnauthorized: () => {
+        calls += 1;
+      },
+    });
+    await client
+      .query({ queryKey: ['probe'], queryFn: () => Promise.reject(error), retry: false })
+      .catch(() => undefined);
+    return calls;
+  }
+
+  it('signs out on an expired session only, never on wrong credentials', async () => {
+    await expect(failWith(new ApiError(401, 'UNAUTHENTICATED', undefined, 'r'))).resolves.toBe(1);
+    await expect(failWith(new ApiError(401, 'INVALID_CREDENTIALS', undefined, 'r'))).resolves.toBe(0);
+  });
+});

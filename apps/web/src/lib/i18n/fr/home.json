@@ -1,0 +1,13 @@
+{
+  "greeting": "Bonjour {{name}}",
+  "greetingAnonymous": "Bonjour",
+  "subtitle": "Votre centre d'attention arrive bientôt.",
+  "cards": {
+    "today": "Aujourd'hui",
+    "todayBody": "Tâches et rappels du jour (phase 04).",
+    "money": "Argent",
+    "moneyBody": "Soldes et dernières opérations (phase 05).",
+    "inbox": "Boîte INBOX",
+    "inboxBody": "Captures à trier (phase 04)."
+  }
+}

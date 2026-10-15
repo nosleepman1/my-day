@@ -17,6 +17,7 @@ export type ApiError = Readonly<{
 /** Messages par défaut, en français, sans aucun détail interne (API.md §5.1). */
 const DEFAULT_MESSAGES: Partial<Record<ErrorCode, string>> = {
   VALIDATION_FAILED: 'La requête contient des champs invalides.',
+  INVALID_CURSOR: 'Curseur de pagination invalide.',
   INVALID_JSON: 'Le corps de la requête est illisible.',
   UNAUTHENTICATED: 'Authentification requise.',
   NOT_FOUND: 'Ressource introuvable.',
@@ -27,6 +28,9 @@ const DEFAULT_MESSAGES: Partial<Record<ErrorCode, string>> = {
   RATE_LIMITED: 'Trop de requêtes. Réessayez plus tard.',
   SERVICE_UNAVAILABLE: 'Service momentanément indisponible.',
   INVALID_CREDENTIALS: 'Adresse e-mail ou mot de passe incorrect.',
+  CSRF_REJECTED: 'Requête refusée.',
+  REAUTH_REQUIRED: 'Confirmez votre mot de passe pour continuer.',
+  REAUTH_FAILED: 'Mot de passe incorrect.',
   EMAIL_NOT_VERIFIED: "Votre adresse e-mail n'est pas encore vérifiée.",
   GONE: 'Ce lien ou cette ressource a expiré.',
   VERSION_CONFLICT: 'La ressource a été modifiée entre-temps.',

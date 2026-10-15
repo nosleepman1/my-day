@@ -2,8 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { LoginEventType } from '@prisma/client';
 
 import { PrismaService } from '../../platform/database/prisma.service';
+import { ipPrefix } from '../../platform/http/ip-prefix';
 import type { IdGeneratorPort } from '../../platform/ids/id-generator.port';
 import { ID_GENERATOR } from '../../platform/ids/ids.module';
+
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
 
 export type LoginEventInput = Readonly<{
   eventType: LoginEventType;
@@ -23,12 +27,20 @@ export interface LoginEventRecorder {
   record(event: LoginEventInput): Promise<void>;
 }
 
+/** Échecs de mot de passe récents pour une adresse (HMAC), base du verrouillage (SECURITY.md §3.7). */
+export type FailureStats = Readonly<{ lastHour: number; lastDay: number; latestAt: Date | null }>;
+
+export interface LoginEventStore extends LoginEventRecorder {
+  failureStats(emailHmac: Buffer, now: Date): Promise<FailureStats>;
+  countSessionEvents(sessionId: string, eventType: LoginEventType): Promise<number>;
+}
+
 /**
  * Journal append-only des événements d'authentification. `orbit_app` n'a que `SELECT, INSERT` sur la table
  * et un déclencheur refuse toute modification : ce repository n'expose donc qu'un ajout.
  */
 @Injectable()
-export class LoginEventsRepository implements LoginEventRecorder {
+export class LoginEventsRepository implements LoginEventStore {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(ID_GENERATOR) private readonly ids: IdGeneratorPort,
@@ -43,10 +55,34 @@ export class LoginEventsRepository implements LoginEventRecorder {
         emailHmac: event.emailHmac ? new Uint8Array(event.emailHmac) : null,
         failureCode: event.failureCode ?? null,
         sessionId: event.sessionId ?? null,
-        ip: event.ip,
+        ip: ipPrefix(event.ip),
         userAgentLabel: event.userAgentLabel,
         occurredAt: event.occurredAt,
       },
     });
+  }
+
+  /** Index `ix_login_events__email_hmac_time` ; seuls les mots de passe faux comptent. */
+  async failureStats(emailHmac: Buffer, now: Date): Promise<FailureStats> {
+    const where = {
+      emailHmac: new Uint8Array(emailHmac),
+      eventType: 'LOGIN_FAILED' as const,
+      failureCode: 'INVALID_CREDENTIALS',
+    };
+    const since = (milliseconds: number) => ({ gt: new Date(now.getTime() - milliseconds) });
+    const [lastHour, lastDay, latest] = await Promise.all([
+      this.prisma.loginEvent.count({ where: { ...where, occurredAt: since(HOUR_MS) } }),
+      this.prisma.loginEvent.count({ where: { ...where, occurredAt: since(DAY_MS) } }),
+      this.prisma.loginEvent.findFirst({
+        where,
+        orderBy: { occurredAt: 'desc' },
+        select: { occurredAt: true },
+      }),
+    ]);
+    return { lastHour, lastDay, latestAt: latest?.occurredAt ?? null };
+  }
+
+  countSessionEvents(sessionId: string, eventType: LoginEventType): Promise<number> {
+    return this.prisma.loginEvent.count({ where: { sessionId, eventType } });
   }
 }

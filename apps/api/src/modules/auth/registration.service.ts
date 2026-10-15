@@ -3,22 +3,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { RegisterRequest, ResendVerificationRequest } from '@orbit/contracts';
 
 import { PASSWORD_HASHER, type PasswordHasherPort } from '../../platform/auth/password-hasher.port';
-import { checkPasswordPolicy, type PasswordViolation } from '../../platform/auth/password-policy';
-import { DomainError } from '../../platform/errors/domain-error';
-import { defaultMessageOf } from '../../platform/http/error-mapping';
 import { enforceMinimumDuration } from '../../platform/time/minimum-duration';
 import { type AccountDirectory, UsersService } from '../users';
 
 import { AUTH_SETTINGS, type AuthSettings } from './auth-settings';
 import { defaultDisplayName, isRegistrationAllowed, normalizeEmail } from './domain/registration';
 import { EmailVerificationService } from './email-verification.service';
-
-const POLICY_MESSAGES: Readonly<Record<PasswordViolation, string>> = {
-  TOO_SHORT: 'Le mot de passe doit contenir au moins 12 caractères.',
-  TOO_LONG: 'Le mot de passe ne peut pas dépasser 128 caractères.',
-  COMMON: 'Ce mot de passe est trop courant.',
-  CONTAINS_EMAIL: 'Le mot de passe ne doit pas contenir votre adresse e-mail.',
-};
+import { assertPasswordPolicy } from './password-changer.service';
 
 /**
  * Inscription et renvoi du lien de vérification (PHASE-01 T4). Les deux routes répondent `202` à
@@ -36,7 +27,7 @@ export class RegistrationService {
   /** @throws {DomainError} VALIDATION_FAILED (politique de mot de passe) ou SERVICE_UNAVAILABLE (e-mail). */
   async register(input: RegisterRequest): Promise<void> {
     const email = normalizeEmail(input.email);
-    this.assertPasswordPolicy(input.password, email);
+    assertPasswordPolicy(input.password, email, 'password');
     await enforceMinimumDuration(() => this.registerAllowed(email, input), this.settings.uniformResponseMs);
   }
 
@@ -69,15 +60,5 @@ export class RegistrationService {
       return;
     }
     await this.verification.issue(created);
-  }
-
-  private assertPasswordPolicy(password: string, email: string): void {
-    const violations = checkPasswordPolicy(password, email);
-    if (violations.length === 0) return;
-    throw new DomainError(
-      'VALIDATION_FAILED',
-      defaultMessageOf('VALIDATION_FAILED'),
-      violations.map((code) => ({ path: ['password'], code, message: POLICY_MESSAGES[code] })),
-    );
   }
 }

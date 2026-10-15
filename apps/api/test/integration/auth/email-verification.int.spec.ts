@@ -8,6 +8,7 @@ import { PrismaService } from '../../../src/platform/database/prisma.service';
 import type { CapturingMailAdapter } from '../../../src/platform/mail/capturing-mail.adapter';
 import { MAIL } from '../../../src/platform/mail/mail.port';
 import { createTestApp } from '../../helpers/create-test-app';
+import { CSRF_HEADERS } from '../../helpers/csrf';
 
 const STRONG = 'thiéboudienne au poisson 2026';
 const USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) Firefox/131.0';
@@ -31,6 +32,7 @@ describe('POST /auth/email/verify', () => {
     const email = `verify-${randomUUID()}@example.test`;
     await request(app.getHttpServer())
       .post('/api/v1/auth/register')
+      .set(CSRF_HEADERS)
       .send({ email, password: STRONG })
       .expect(202);
     return { email, token: mail.lastTokenFor(email) ?? '' };
@@ -39,6 +41,7 @@ describe('POST /auth/email/verify', () => {
   const verify = (token: string) =>
     request(app.getHttpServer())
       .post('/api/v1/auth/email/verify')
+      .set(CSRF_HEADERS)
       .set('User-Agent', USER_AGENT)
       .send({ token });
 
@@ -55,12 +58,16 @@ describe('POST /auth/email/verify', () => {
     const events = await prisma.loginEvent.findMany({ where: { userId: user.id } });
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ eventType: 'EMAIL_VERIFIED', userAgentLabel: USER_AGENT });
-    expect(events[0]?.ip).toMatch(/127\.0\.0\.1|::1/);
+    expect(events[0]?.ip).toMatch(/^(127\.0\.0\.0|::)$/);
   });
 
   it('refuses a token replaced by a resend, and accepts the new one', async () => {
     const { email, token: first } = await registerAndGetToken();
-    await request(app.getHttpServer()).post('/api/v1/auth/email/verify/resend').send({ email }).expect(202);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/email/verify/resend')
+      .set(CSRF_HEADERS)
+      .send({ email })
+      .expect(202);
     const second = mail.lastTokenFor(email) ?? '';
 
     await verify(first).expect(410);

@@ -27,7 +27,7 @@ export class EmailVerificationService {
   async issue(account: AccountSummary): Promise<void> {
     const now = this.clock.now();
     const { token, hash } = generateOpaqueToken();
-    await this.tokens.replaceActive({
+    const replaced = await this.tokens.replaceActive({
       userId: account.id,
       purpose: 'VERIFY_SIGNUP',
       targetEmail: account.email,
@@ -35,6 +35,7 @@ export class EmailVerificationService {
       expiresAt: new Date(now.getTime() + EMAIL_VERIFICATION_TTL_HOURS * HOUR_MS),
       now,
     });
+    if (!replaced) return;
     await this.mailer.sendVerification(account.email, token, EMAIL_VERIFICATION_TTL_HOURS);
   }
 

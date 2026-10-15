@@ -73,7 +73,11 @@ export class Argon2PasswordHasher implements PasswordHasherPort {
   }
 
   async verifyAgainstDummy(password: string): Promise<false> {
-    this.dummyHash ??= this.hash(DUMMY_PASSWORD);
+    this.dummyHash ??= this.hash(DUMMY_PASSWORD).catch((error: unknown) => {
+      // Sémaphore saturé : ne pas mémoriser l'échec, sinon chaque adresse inconnue répondrait 503 (oracle).
+      this.dummyHash = undefined;
+      throw error;
+    });
     await this.verify(await this.dummyHash, password);
     return false;
   }

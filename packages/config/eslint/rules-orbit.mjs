@@ -88,6 +88,22 @@ export const API_MODULES = [
 ];
 
 /** Construit l'option complète de `no-restricted-syntax` pour une portée. */
+/** Front React : textes via i18n uniquement, aucun HTML injecté (FRONTEND.md §16, §14). */
+export const WEB_UI = [
+  {
+    selector: 'JSXText[value=/[A-Za-zÀ-ÿ]/]',
+    message: 'Texte en dur interdit dans le JSX : passer par i18n (clé module.ecran.element).',
+  },
+  {
+    selector: 'JSXExpressionContainer > Literal[value=/[A-Za-zÀ-ÿ]/]',
+    message: 'Texte en dur interdit dans le JSX : passer par i18n (clé module.ecran.element).',
+  },
+  {
+    selector: 'JSXAttribute[name.name="dangerouslySetInnerHTML"]',
+    message: 'dangerouslySetInnerHTML interdit (FRONTEND.md §14, XSS).',
+  },
+];
+
 export function syntaxFor(...groups) {
   return ['error', ...groups.flat()];
 }
