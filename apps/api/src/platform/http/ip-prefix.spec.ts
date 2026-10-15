@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ipPrefix } from './ip-prefix';
+import { ipPrefix, ipThrottleKey } from './ip-prefix';
 
 describe('ipPrefix (SECURITY.md §3.2, minimisation)', () => {
   it.each([
@@ -18,5 +18,21 @@ describe('ipPrefix (SECURITY.md §3.2, minimisation)', () => {
   it('returns null for a missing or invalid address', () => {
     expect(ipPrefix(null)).toBeNull();
     expect(ipPrefix('not-an-ip')).toBeNull();
+  });
+});
+
+describe('ipThrottleKey', () => {
+  it.each([
+    ['203.0.113.42', '203.0.113.42'],
+    ['::ffff:203.0.113.42', '203.0.113.42'],
+    ['2001:db8:abcd:12::1', '2001:db8:abcd:12::/64'],
+    ['2001:db8:abcd:12:ffff::9', '2001:db8:abcd:12::/64'],
+  ])('keys %s as %s', (ip, expected) => {
+    expect(ipThrottleKey(ip)).toBe(expected);
+  });
+
+  it('returns null for a missing or invalid address', () => {
+    expect(ipThrottleKey(null)).toBeNull();
+    expect(ipThrottleKey('not-an-ip')).toBeNull();
   });
 });

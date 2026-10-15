@@ -24,6 +24,22 @@ function expandIpv6(address: string): string[] {
 }
 
 /**
+ * Clé de limitation de débit par IP : IPv4 complète, IPv6 regroupée par /64 (un client IPv6 dispose
+ * d'un /64 entier ; compter adresse par adresse rendrait la limite inopérante).
+ */
+export function ipThrottleKey(ip: string | null): string | null {
+  if (ip === null) return null;
+  const address = IPV4_MAPPED.exec(ip)?.[1] ?? ip;
+  const version = isIP(address.split('%')[0] ?? '');
+  if (version === 4) return address;
+  if (version !== 6) return null;
+  const prefix = expandIpv6(address)
+    .slice(0, 4)
+    .map((group) => Number.parseInt(group, 16).toString(16));
+  return `${prefix.join(':')}::/64`;
+}
+
+/**
  * IP tronquée stockée avec une session (SECURITY.md §3.2, §9.1) : adresse réseau /24 (IPv4) ou /48 (IPv6),
  * bits d'hôte à zéro et sans suffixe CIDR, que le client Prisma refuse pour une colonne `inet`.
  * Une IPv4 encapsulée (`::ffff:a.b.c.d`) est traitée comme IPv4. `null` si l'adresse est absente ou invalide.

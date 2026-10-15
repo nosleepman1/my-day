@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 
+import { AuditModule } from './audit/audit.module';
 import { PasswordHasherModule } from './auth/password-hasher.module';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
@@ -22,6 +23,7 @@ import { TimeModule } from './time/time.module';
     ConfigModule,
     ObservabilityModule,
     TenantModule,
+    AuditModule,
     DatabaseModule,
     IdsModule,
     TimeModule,
