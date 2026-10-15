@@ -1,0 +1,47 @@
+{
+  "entries": {
+    "home": "Accueil",
+    "tasks": "Tâches",
+    "ideas": "Idées",
+    "projects": "Projets",
+    "notes": "Notes et documents",
+    "calendar": "Calendrier",
+    "goals": "Objectifs",
+    "finance": "Finances",
+    "debts": "Dettes et créances",
+    "pro": "Pro",
+    "automations": "Automatisations",
+    "integrations": "Intégrations",
+    "settings": "Paramètres",
+    "devInventory": "Inventaire",
+    "devVault": "Coffre-fort",
+    "admin": "Admin"
+  },
+  "sections": {
+    "home": "Accueil",
+    "organisation": "Organisation",
+    "money": "Argent",
+    "system": "Système",
+    "dev": "Dev"
+  },
+  "more": "Plus",
+  "moreTitle": "Plus",
+  "adminBadge": "ADMIN",
+  "capture": "Capture rapide",
+  "captureShort": "Capture",
+  "search": "Rechercher",
+  "searchSoon": "La recherche arrive en phase 7.",
+  "notifications": "Notifications",
+  "notificationsSoon": "Les notifications arrivent en phase 8.",
+  "userMenu": "Menu du compte",
+  "logout": "Se déconnecter",
+  "theme": {
+    "label": "Thème",
+    "SYSTEM": "Automatique",
+    "LIGHT": "Clair",
+    "DARK": "Sombre"
+  },
+  "mainNavigation": "Navigation principale",
+  "mobileNavigation": "Navigation rapide",
+  "skipToContent": "Aller au contenu"
+}

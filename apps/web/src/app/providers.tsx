@@ -1,9 +1,26 @@
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import type { i18n } from 'i18next';
 import type { JSX, ReactNode } from 'react';
+import { I18nextProvider } from 'react-i18next';
 
-type AppProvidersProps = Readonly<{ queryClient: QueryClient; children: ReactNode }>;
+import { EnvironmentBanner } from '@/components/environment-banner';
+import { Toaster } from '@/components/ui/toaster';
 
-/** Fournisseurs globaux. i18n, thème et notifications arrivent en PHASE-02 (FRONTEND.md §2). */
-export function AppProviders({ queryClient, children }: AppProvidersProps): JSX.Element {
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+import { ThemeProvider } from './theme';
+
+type AppProvidersProps = Readonly<{ queryClient: QueryClient; i18n: i18n; children: ReactNode }>;
+
+/** Fournisseurs globaux : requêtes, traductions, thème, notifications (FRONTEND.md §2). */
+export function AppProviders({ queryClient, i18n, children }: AppProvidersProps): JSX.Element {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        <ThemeProvider>
+          <EnvironmentBanner appEnv={import.meta.env.VITE_APP_ENV} />
+          {children}
+          <Toaster />
+        </ThemeProvider>
+      </I18nextProvider>
+    </QueryClientProvider>
+  );
 }

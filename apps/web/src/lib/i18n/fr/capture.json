@@ -1,0 +1,25 @@
+{
+  "title": "Capture rapide",
+  "description": "Notez une idée, une tâche ou une dépense en quelques secondes.",
+  "inputLabel": "Texte à capturer",
+  "placeholder": "Ex. : Appeler Moussa demain, Wave 5 000 taxi…",
+  "typeLabel": "Type d'élément",
+  "types": {
+    "idea": "Idée",
+    "task": "Tâche",
+    "note": "Note",
+    "expense": "Dépense",
+    "income": "Entrée"
+  },
+  "soon": "Ce type sera disponible en phase {{phase}}.",
+  "submit": "Capturer",
+  "sent": "C'est noté.",
+  "queued": "Enregistré sur cet appareil : synchronisation au retour du réseau.",
+  "more": "Plus d'options",
+  "dueDate": "Échéance",
+  "pending_one": "{{count}} capture en attente de synchronisation",
+  "pending_other": "{{count}} captures en attente de synchronisation",
+  "failed": "Non synchronisée : « {{title}} » ({{code}})",
+  "discard": "Abandonner",
+  "noType": "Activez un module dans les paramètres pour capturer."
+}

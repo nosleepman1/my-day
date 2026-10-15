@@ -1,0 +1,61 @@
+{
+  "appName": "ORBIT",
+  "environment": {
+    "banner": "{{env}} : environnement de test, aucune donnée réelle"
+  },
+  "system": {
+    "checking": "Vérification de l'API…",
+    "ok": "API OK",
+    "unreachable": "API injoignable"
+  },
+  "actions": {
+    "retry": "Réessayer",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "save": "Enregistrer",
+    "confirm": "Confirmer",
+    "continue": "Continuer",
+    "back": "Retour",
+    "reload": "Recharger",
+    "dismiss": "Masquer",
+    "backHome": "Retour à l'accueil",
+    "openSettings": "Ouvrir les paramètres"
+  },
+  "states": {
+    "loading": "Chargement…",
+    "empty": "Rien pour l'instant.",
+    "errorTitle": "Impossible de charger ces données",
+    "networkTitle": "Pas de connexion",
+    "requestId": "Référence : {{id}}",
+    "forbiddenTitle": "Accès refusé",
+    "forbiddenBody": "Vous n'avez pas accès à cette page.",
+    "notFoundTitle": "Page introuvable",
+    "notFoundBody": "Cette page n'existe pas ou a été déplacée.",
+    "archived": "Cet élément est archivé : il est en lecture seule.",
+    "stale": "Ces données ne sont peut-être plus à jour.",
+    "offline": "Vous êtes hors ligne. Les données affichées peuvent être anciennes.",
+    "conflictTitle": "Modification concurrente",
+    "conflictBody": "Cet élément a été modifié ailleurs pendant votre saisie.",
+    "conflictReload": "Recharger la version actuelle",
+    "conflictKeep": "Garder ma saisie",
+    "formErrors": "Corrigez les erreurs suivantes :",
+    "moduleDisabledTitle": "Ce module est désactivé",
+    "moduleDisabledBody": "Activez-le dans les paramètres pour l'utiliser.",
+    "comingSoonTitle": "Bientôt disponible",
+    "comingSoonBody": "Ce module arrive dans une prochaine version (phase {{phase}}).",
+    "booting": "Démarrage d'ORBIT…"
+  },
+  "money": {
+    "noDecimals": "Le FCFA n'a pas de centimes.",
+    "tooManyDecimals": "Au plus {{count}} décimales.",
+    "invalid": "Montant invalide.",
+    "hidden": "Montant masqué"
+  },
+  "pwa": {
+    "updateAvailable": "Une nouvelle version d'ORBIT est disponible.",
+    "update": "Mettre à jour",
+    "install": "Installer ORBIT sur cet appareil",
+    "installAction": "Installer",
+    "offlineReady": "ORBIT est disponible hors ligne."
+  }
+}

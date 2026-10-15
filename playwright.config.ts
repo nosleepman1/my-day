@@ -48,6 +48,12 @@ export default defineConfig({
         DATABASE_URL: e2eDatabaseUrl,
         SMTP_PORT: process.env['ORBIT_SMTP_PORT'] ?? '1025',
         MAIL_FROM: 'ORBIT <no-reply@orbit.localhost>',
+        RATE_LIMIT_HMAC_KEY: 'e2e-only-rate-limit-key-0123456789abcdef',
+        // Les parcours E2E créent leurs propres comptes (adresses uniques en e2e.orbit.test).
+        REGISTRATION_MODE: 'open',
+        // Chaque parcours crée son compte depuis la même IP : la limite d'inscription (5/h) serait atteinte.
+        // Les limitations sont couvertes par les tests d'intégration (`protections.int.spec.ts`).
+        RATE_LIMIT_ENABLED: 'false',
       },
     },
     {
