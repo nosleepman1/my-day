@@ -12,6 +12,8 @@ import {
   CategoryBreakdownQuerySchema,
   CategoryEnvelopeSchema,
   CategoryListEnvelopeSchema,
+  CancelDebtSchema,
+  CancelTransactionSchema,
   CloseAccountSchema,
   ConfirmReconciliationSchema,
   CounterpartyEnvelopeSchema,
@@ -19,28 +21,37 @@ import {
   CreateAccountSchema,
   CreateCategorySchema,
   CreateCounterpartySchema,
+  CreateDebtSchema,
+  CreateRepaymentSchema,
   CreateTransactionSchema,
-  CancelTransactionSchema,
   CreateTransferSchema,
+  DebtEnvelopeSchema,
+  DebtListEnvelopeSchema,
+  DebtSummaryEnvelopeSchema,
   FinanceSummaryEnvelopeSchema,
   FinanceSummaryQuerySchema,
   IdParamSchema,
   ListAccountsQuerySchema,
   ListCategoriesQuerySchema,
   ListCounterpartiesQuerySchema,
+  ListDebtsQuerySchema,
   ListTransactionsQuerySchema,
   MergeCounterpartySchema,
   ReconciliationQuerySchema,
   ReconciliationResultEnvelopeSchema,
   ReconciliationStatusEnvelopeSchema,
   ReopenAccountSchema,
+  RepaymentEnvelopeSchema,
+  RepaymentListEnvelopeSchema,
   TransactionEnvelopeSchema,
   TransactionListEnvelopeSchema,
   TransferEnvelopeSchema,
   UpdateAccountSchema,
   UpdateCategorySchema,
   UpdateCounterpartySchema,
+  UpdateDebtSchema,
   UpdateTransactionDetailsSchema,
+  WriteOffDebtSchema,
 } from '@orbit/contracts';
 
 export class IdParamDto extends createZodDto(IdParamSchema) {}
@@ -97,3 +108,16 @@ export class CashFlowEnvelopeDto extends createZodDto(CashFlowEnvelopeSchema) {}
 
 export class CategoryBreakdownQueryDto extends createZodDto(CategoryBreakdownQuerySchema) {}
 export class CategoryBreakdownEnvelopeDto extends createZodDto(CategoryBreakdownEnvelopeSchema) {}
+
+export class CreateDebtDto extends createZodDto(CreateDebtSchema) {}
+export class UpdateDebtDto extends createZodDto(UpdateDebtSchema) {}
+export class CancelDebtDto extends createZodDto(CancelDebtSchema) {}
+export class WriteOffDebtDto extends createZodDto(WriteOffDebtSchema) {}
+export class ListDebtsQueryDto extends createZodDto(ListDebtsQuerySchema) {}
+export class DebtEnvelopeDto extends createZodDto(DebtEnvelopeSchema) {}
+export class DebtListEnvelopeDto extends createZodDto(DebtListEnvelopeSchema) {}
+export class DebtSummaryEnvelopeDto extends createZodDto(DebtSummaryEnvelopeSchema) {}
+
+export class CreateRepaymentDto extends createZodDto(CreateRepaymentSchema) {}
+export class RepaymentEnvelopeDto extends createZodDto(RepaymentEnvelopeSchema) {}
+export class RepaymentListEnvelopeDto extends createZodDto(RepaymentListEnvelopeSchema) {}

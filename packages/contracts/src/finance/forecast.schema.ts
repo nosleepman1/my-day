@@ -49,3 +49,4 @@ export const ForecastReportResponseSchema = z.object({
 export type ForecastReportResponse = z.infer<typeof ForecastReportResponseSchema>;
 
 export const ForecastReportEnvelopeSchema = dataEnvelope(ForecastReportResponseSchema);
+export type ForecastReportEnvelope = z.infer<typeof ForecastReportEnvelopeSchema>;

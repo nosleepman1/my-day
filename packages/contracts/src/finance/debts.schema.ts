@@ -57,10 +57,10 @@ export type CreateDebtInput = z.input<typeof CreateDebtSchema>;
 
 export const UpdateDebtSchema = z
   .object({
-    title: optionalText(160).optional(),
-    description: optionalText(2000).nullable().optional(),
+    title: text(1, 160).optional(),
+    description: optionalText(2000).optional(),
     dueDate: CivilDateSchema.nullable().optional(),
-    notes: optionalText(2000).nullable().optional(),
+    notes: optionalText(2000).optional(),
   })
   .strict();
 export type UpdateDebt = z.infer<typeof UpdateDebtSchema>;
@@ -179,7 +179,16 @@ export const DebtSummaryResponseSchema = z.object({
 export type DebtSummaryResponse = z.infer<typeof DebtSummaryResponseSchema>;
 
 export const DebtEnvelopeSchema = dataEnvelope(DebtResponseSchema);
+export type DebtEnvelope = z.infer<typeof DebtEnvelopeSchema>;
+
 export const DebtListEnvelopeSchema = listEnvelope(DebtResponseSchema);
+export type DebtListEnvelope = z.infer<typeof DebtListEnvelopeSchema>;
+
 export const RepaymentEnvelopeSchema = dataEnvelope(RepaymentResponseSchema);
+export type RepaymentEnvelope = z.infer<typeof RepaymentEnvelopeSchema>;
+
 export const RepaymentListEnvelopeSchema = listEnvelope(RepaymentResponseSchema);
+export type RepaymentListEnvelope = z.infer<typeof RepaymentListEnvelopeSchema>;
+
 export const DebtSummaryEnvelopeSchema = dataEnvelope(DebtSummaryResponseSchema);
+export type DebtSummaryEnvelope = z.infer<typeof DebtSummaryEnvelopeSchema>;

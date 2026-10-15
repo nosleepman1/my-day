@@ -36,6 +36,19 @@ export const AUDIT_ACTIONS = [
   'finance.adjustment.create',
   'finance.transfer.create',
   'finance.reconciliation.confirm',
+  'finance.debt.create',
+  'finance.debt.update',
+  'finance.debt.rescheduled',
+  'finance.debt.cancel',
+  'finance.debt.write_off',
+  'finance.debt.repayment_create',
+  'finance.debt.repayment_delete',
+  'finance.recurring.create',
+  'finance.recurring.update',
+  'finance.recurring.pause',
+  'finance.recurring.resume',
+  'finance.recurring.occurrence_confirm',
+  'finance.recurring.occurrence_skip',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

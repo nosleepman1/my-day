@@ -168,6 +168,13 @@ export const SkipOccurrenceSchema = z
 export type SkipOccurrence = z.infer<typeof SkipOccurrenceSchema>;
 
 export const RecurringTransactionEnvelopeSchema = dataEnvelope(RecurringTransactionResponseSchema);
+export type RecurringTransactionEnvelope = z.infer<typeof RecurringTransactionEnvelopeSchema>;
+
 export const RecurringTransactionListEnvelopeSchema = listEnvelope(RecurringTransactionResponseSchema);
+export type RecurringTransactionListEnvelope = z.infer<typeof RecurringTransactionListEnvelopeSchema>;
+
 export const RecurringOccurrenceEnvelopeSchema = dataEnvelope(RecurringOccurrenceResponseSchema);
+export type RecurringOccurrenceEnvelope = z.infer<typeof RecurringOccurrenceEnvelopeSchema>;
+
 export const RecurringOccurrenceListEnvelopeSchema = listEnvelope(RecurringOccurrenceResponseSchema);
+export type RecurringOccurrenceListEnvelope = z.infer<typeof RecurringOccurrenceListEnvelopeSchema>;
