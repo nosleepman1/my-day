@@ -1,0 +1,73 @@
+/*
+ * Jetons du design system (DESIGN_SYSTEM.md §2, §3). Les composants n'utilisent que les noms sémantiques
+ * exposés par `@theme` dans globals.css (`bg-surface`, `text-muted-foreground`…), jamais une couleur brute.
+ * Thème clair sur `:root`, sombre sur `.dark` (classe posée par public/theme-init.js avant le premier rendu).
+ */
+:root {
+  color-scheme: light;
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --surface-muted: #eef0f3;
+  --foreground: #14171c;
+  --muted-foreground: #576070;
+  --border: #e3e6eb;
+  --input-border: #858d9c;
+  --primary: #2b4bc0;
+  --primary-foreground: #ffffff;
+  --ring: #2b4bc0;
+  --zone-dev: #6b3fa0;
+  --success: #067647;
+  --success-surface: #ecfdf3;
+  --warning: #8a4a00;
+  --warning-surface: #fff7e6;
+  --danger: #b42318;
+  --danger-surface: #fef3f2;
+  --danger-foreground: #ffffff;
+  --info: #2b4bc0;
+  --info-surface: #eef2ff;
+  --money-in: #0b6584;
+  --money-out: #a33b0b;
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0e1014;
+  --surface: #171a21;
+  --surface-muted: #1f232b;
+  --foreground: #e9ebef;
+  --muted-foreground: #a3a9b6;
+  --border: #2a2f3a;
+  --input-border: #6b7385;
+  --primary: #93abff;
+  --primary-foreground: #0e1014;
+  --ring: #93abff;
+  --zone-dev: #c3a6f0;
+  --success: #5bd39a;
+  --success-surface: #0b2a1c;
+  --warning: #f7c35c;
+  --warning-surface: #2e2108;
+  --danger: #ff8a80;
+  --danger-surface: #3a1513;
+  --danger-foreground: #0e1014;
+  --info: #93abff;
+  --info-surface: #1a2140;
+  --money-in: #5ec4e6;
+  --money-out: #f4a06a;
+  /* En sombre, les ombres cèdent la place à une bordure et à une surface plus claire (§3.5). */
+  --shadow-sm: 0 0 0 1px var(--border);
+  --shadow-md: 0 0 0 1px var(--border);
+  --shadow-lg: 0 0 0 1px var(--border);
+}
+
+/* §3.6 : mouvement réduit, seuls les fondus courts subsistent. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}

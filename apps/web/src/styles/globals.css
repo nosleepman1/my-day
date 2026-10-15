@@ -1,12 +1,93 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import './tokens.css';
 
-/* Les tokens du design system (DESIGN_SYSTEM.md) arrivent en PHASE-02. */
-:root {
-  color-scheme: light dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+/* Thème sombre piloté par la classe `.dark` sur <html> (DESIGN_SYSTEM.md §2). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Noms sémantiques exposés à Tailwind (§3) : `bg-surface`, `text-muted-foreground`, `border-input-border`… */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input-border: var(--input-border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --color-zone-dev: var(--zone-dev);
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-info: var(--info);
+  --color-info-surface: var(--info-surface);
+  --color-money-in: var(--money-in);
+  --color-money-out: var(--money-out);
+
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* §3.4 : taille / interligne / graisse. */
+  --text-display: 1.875rem;
+  --text-display--line-height: 2.25rem;
+  --text-display--font-weight: 600;
+  --text-h1: 1.5rem;
+  --text-h1--line-height: 2rem;
+  --text-h1--font-weight: 600;
+  --text-h2: 1.25rem;
+  --text-h2--line-height: 1.75rem;
+  --text-h2--font-weight: 600;
+  --text-h3: 1.125rem;
+  --text-h3--line-height: 1.625rem;
+  --text-h3--font-weight: 600;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5rem;
+  --text-body-strong: 1rem;
+  --text-body-strong--line-height: 1.5rem;
+  --text-body-strong--font-weight: 500;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.25rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-caption--font-weight: 500;
+
+  /* §3.5 : rayons et ombres (remplacées par une bordure en sombre, voir tokens.css). */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-sheet: 20px;
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.06);
+  --shadow-md: 0 4px 12px rgb(16 24 40 / 0.1);
+  --shadow-lg: 0 12px 32px rgb(16 24 40 / 0.16);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background font-sans text-body text-foreground antialiased;
+  }
+
+  /* Focus toujours visible (WCAG 2.2 AA), anneau aux couleurs du thème. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Champs ≥ 16 px : pas de zoom automatique sur iOS (§3.4). */
+  input,
+  select,
+  textarea {
+    font-size: max(1rem, 16px);
+  }
 }
