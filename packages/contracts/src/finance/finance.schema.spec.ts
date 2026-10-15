@@ -20,8 +20,10 @@ import {
   ReconciliationResultSchema,
 } from './reconciliation.schema';
 import {
+  BalancesReportSchema,
   CashFlowQuerySchema,
   CashFlowReportSchema,
+  FinanceSummaryReportSchema,
   NetWorthReportSchema,
   CategoryBreakdownReportSchema,
 } from './reports.schema';
@@ -383,6 +385,45 @@ describe('finance contracts', () => {
         ],
       });
       expect(report.categories[0]?.percentage).toBe(100);
+    });
+
+    it('validates finance summary report schema', () => {
+      const report = FinanceSummaryReportSchema.parse({
+        period: { from: '2026-01-01', to: '2026-01-31' },
+        summaries: [
+          {
+            currency: 'XOF',
+            incomeMinor: '500000',
+            expenseMinor: '300000',
+            netMinor: '200000',
+            otherIncomeMinor: '0',
+            adjustmentsMinor: '0',
+          },
+        ],
+      });
+      expect(report.summaries).toHaveLength(1);
+      expect(report.summaries[0]?.netMinor).toBe('200000');
+    });
+
+    it('validates balances report schema', () => {
+      const report = BalancesReportSchema.parse({
+        asOf: '2026-10-15',
+        accounts: [
+          {
+            accountId: UUID_1,
+            name: 'SGBS',
+            type: 'BANK',
+            currency: 'XOF',
+            balanceMinor: '1500000',
+            isArchived: false,
+          },
+        ],
+        totalsByCurrency: {
+          XOF: '1500000',
+        },
+      });
+      expect(report.accounts).toHaveLength(1);
+      expect(report.totalsByCurrency['XOF']).toBe('1500000');
     });
   });
 

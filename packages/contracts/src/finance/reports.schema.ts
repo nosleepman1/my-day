@@ -7,11 +7,71 @@ import { dataEnvelope } from '../common/envelope';
 import { AccountTypeSchema } from './accounts.schema';
 import { CategoryKindSchema } from './categories.schema';
 
+export const FinanceSummaryQuerySchema = z
+  .object({
+    from: CivilDateSchema.optional(),
+    to: CivilDateSchema.optional(),
+    fromDate: CivilDateSchema.optional(),
+    toDate: CivilDateSchema.optional(),
+  })
+  .strict();
+export type FinanceSummaryQuery = z.infer<typeof FinanceSummaryQuerySchema>;
+
+export const CurrencySummaryItemSchema = z.object({
+  currency: CurrencyCodeSchema,
+  incomeMinor: MoneyStringSchema,
+  expenseMinor: MoneyStringSchema,
+  netMinor: MoneyStringSchema,
+  otherIncomeMinor: MoneyStringSchema,
+  adjustmentsMinor: MoneyStringSchema,
+});
+export type CurrencySummaryItem = z.infer<typeof CurrencySummaryItemSchema>;
+
+export const FinanceSummaryReportSchema = z.object({
+  period: z.object({
+    from: CivilDateSchema,
+    to: CivilDateSchema,
+  }),
+  summaries: z.array(CurrencySummaryItemSchema),
+});
+export type FinanceSummaryReport = z.infer<typeof FinanceSummaryReportSchema>;
+export const FinanceSummaryEnvelopeSchema = dataEnvelope(FinanceSummaryReportSchema);
+export type FinanceSummaryEnvelope = z.infer<typeof FinanceSummaryEnvelopeSchema>;
+
+export const BalancesReportQuerySchema = z
+  .object({
+    asOf: CivilDateSchema.optional(),
+  })
+  .strict();
+export type BalancesReportQuery = z.infer<typeof BalancesReportQuerySchema>;
+
+export const AccountBalanceItemSchema = z.object({
+  accountId: z.uuid(),
+  name: z.string(),
+  type: AccountTypeSchema,
+  currency: CurrencyCodeSchema,
+  balanceMinor: MoneyStringSchema,
+  isArchived: z.boolean(),
+});
+export type AccountBalanceItem = z.infer<typeof AccountBalanceItemSchema>;
+
+export const BalancesReportSchema = z.object({
+  asOf: CivilDateSchema,
+  accounts: z.array(AccountBalanceItemSchema),
+  totalsByCurrency: z.record(z.string(), MoneyStringSchema),
+});
+export type BalancesReport = z.infer<typeof BalancesReportSchema>;
+export const BalancesReportEnvelopeSchema = dataEnvelope(BalancesReportSchema);
+export type BalancesReportEnvelope = z.infer<typeof BalancesReportEnvelopeSchema>;
+
 export const CashFlowQuerySchema = z
   .object({
-    fromDate: CivilDateSchema,
-    toDate: CivilDateSchema,
+    from: CivilDateSchema.optional(),
+    to: CivilDateSchema.optional(),
+    fromDate: CivilDateSchema.optional(),
+    toDate: CivilDateSchema.optional(),
     currency: CurrencyCodeSchema,
+    granularity: z.enum(['day', 'week', 'month']).default('month').optional(),
   })
   .strict();
 export type CashFlowQuery = z.infer<typeof CashFlowQuerySchema>;
@@ -72,9 +132,11 @@ export type NetWorthEnvelope = z.infer<typeof NetWorthEnvelopeSchema>;
 
 export const CategoryBreakdownQuerySchema = z
   .object({
-    fromDate: CivilDateSchema,
-    toDate: CivilDateSchema,
-    kind: CategoryKindSchema,
+    from: CivilDateSchema.optional(),
+    to: CivilDateSchema.optional(),
+    fromDate: CivilDateSchema.optional(),
+    toDate: CivilDateSchema.optional(),
+    kind: CategoryKindSchema.optional(),
     currency: CurrencyCodeSchema,
   })
   .strict();

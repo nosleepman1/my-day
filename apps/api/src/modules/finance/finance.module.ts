@@ -10,6 +10,8 @@ import { CounterpartiesController } from './counterparties/counterparties.contro
 import { CounterpartiesRepository } from './counterparties/counterparties.repository';
 import { CounterpartiesService } from './counterparties/counterparties.service';
 import { ReconciliationService } from './reconciliation/reconciliation.service';
+import { ReportsController } from './reports/reports.controller';
+import { ReportsService } from './reports/reports.service';
 import { FinanceContext } from './shared/finance-context';
 import { TransactionReferences } from './transactions/transaction-references';
 import { TransactionsController } from './transactions/transactions.controller';
@@ -26,6 +28,7 @@ import { TransfersService } from './transfers/transfers.service';
     AccountsController,
     CategoriesController,
     CounterpartiesController,
+    ReportsController,
     TransactionsController,
     TransfersController,
   ],
@@ -38,6 +41,7 @@ import { TransfersService } from './transfers/transfers.service';
     CounterpartiesRepository,
     CounterpartiesService,
     ReconciliationService,
+    ReportsService,
     TransactionReferences,
     TransactionsRepository,
     TransactionsService,
@@ -54,6 +58,7 @@ import { TransfersService } from './transfers/transfers.service';
     CounterpartiesRepository,
     CounterpartiesService,
     ReconciliationService,
+    ReportsService,
     TransactionReferences,
     TransactionsRepository,
     TransactionsService,

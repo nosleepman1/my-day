@@ -4,6 +4,12 @@ import {
   AccountAdjustmentSchema,
   AccountEnvelopeSchema,
   AccountListEnvelopeSchema,
+  BalancesReportEnvelopeSchema,
+  BalancesReportQuerySchema,
+  CashFlowEnvelopeSchema,
+  CashFlowQuerySchema,
+  CategoryBreakdownEnvelopeSchema,
+  CategoryBreakdownQuerySchema,
   CategoryEnvelopeSchema,
   CategoryListEnvelopeSchema,
   CloseAccountSchema,
@@ -16,6 +22,8 @@ import {
   CreateTransactionSchema,
   CancelTransactionSchema,
   CreateTransferSchema,
+  FinanceSummaryEnvelopeSchema,
+  FinanceSummaryQuerySchema,
   IdParamSchema,
   ListAccountsQuerySchema,
   ListCategoriesQuerySchema,
@@ -77,3 +85,15 @@ export class ReconciliationQueryDto extends createZodDto(ReconciliationQuerySche
 export class ConfirmReconciliationDto extends createZodDto(ConfirmReconciliationSchema) {}
 export class ReconciliationStatusEnvelopeDto extends createZodDto(ReconciliationStatusEnvelopeSchema) {}
 export class ReconciliationResultEnvelopeDto extends createZodDto(ReconciliationResultEnvelopeSchema) {}
+
+export class FinanceSummaryQueryDto extends createZodDto(FinanceSummaryQuerySchema) {}
+export class FinanceSummaryEnvelopeDto extends createZodDto(FinanceSummaryEnvelopeSchema) {}
+
+export class BalancesReportQueryDto extends createZodDto(BalancesReportQuerySchema) {}
+export class BalancesReportEnvelopeDto extends createZodDto(BalancesReportEnvelopeSchema) {}
+
+export class CashFlowQueryDto extends createZodDto(CashFlowQuerySchema) {}
+export class CashFlowEnvelopeDto extends createZodDto(CashFlowEnvelopeSchema) {}
+
+export class CategoryBreakdownQueryDto extends createZodDto(CategoryBreakdownQuerySchema) {}
+export class CategoryBreakdownEnvelopeDto extends createZodDto(CategoryBreakdownEnvelopeSchema) {}
