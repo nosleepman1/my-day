@@ -8,10 +8,41 @@ const VALID = {
   APP_ORIGIN: 'http://localhost:5173',
   DATABASE_URL: 'postgresql://orbit_app:fake-password@localhost:5432/orbit',
   MAIL_FROM: 'ORBIT <no-reply@orbit.localhost>',
+  RATE_LIMIT_HMAC_KEY: 'test-only-rate-limit-key-0123456789abcdef',
 } as const;
 
 const noSecretFile = (): string => {
   throw new Error('no secret file expected');
+};
+
+/** Configuration de staging complète, valeurs fictives ; les secrets viennent de `*_FILE`. */
+const DEPLOYED = {
+  NODE_ENV: 'production',
+  APP_ENV: 'staging',
+  APP_ORIGIN: 'https://orbit.example.com',
+  API_PUBLIC_URL: 'https://api-staging.example.com',
+  SENTRY_DSN: 'https://fakekey@o0.ingest.de.sentry.io/1',
+  MAIL_FROM: 'ORBIT <no-reply@orbit.example.com>',
+  SMTP_HOST: 'smtp-relay.example.com',
+  SMTP_PORT: '587',
+  SMTP_SECURITY: 'starttls',
+  SMTP_USER: 'fake-smtp-user',
+  MAIL_ALLOWLIST: '@Example.com, owner@example.org',
+  DATABASE_URL_FILE: '/run/secrets/database_url',
+  RATE_LIMIT_HMAC_KEY_FILE: '/run/secrets/rate_limit_hmac_key',
+  SMTP_PASSWORD_FILE: '/run/secrets/smtp_password',
+} as const;
+
+const DEPLOYED_SECRETS: Readonly<Record<string, string>> = {
+  '/run/secrets/database_url': 'postgresql://orbit_app:fake@db:5432/orbit\n',
+  '/run/secrets/rate_limit_hmac_key': 'file-only-rate-limit-key-0123456789abcdef\n',
+  '/run/secrets/smtp_password': 'fake-smtp-password\n',
+};
+
+const deployedSecrets = (path: string): string => {
+  const secret = DEPLOYED_SECRETS[path];
+  if (secret === undefined) throw new Error(`unexpected secret file ${path}`);
+  return secret;
 };
 
 describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
@@ -45,22 +76,45 @@ describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
   });
 
   it('reads secrets from *_FILE in deployed environments', () => {
-    const { DATABASE_URL: _plain, ...rest } = VALID;
-    const env = loadEnv(
-      {
-        ...rest,
-        NODE_ENV: 'production',
-        APP_ENV: 'staging',
-        APP_ORIGIN: 'https://orbit.example.com',
-        DATABASE_URL_FILE: '/run/secrets/database_url',
-      },
-      (path) => (path === '/run/secrets/database_url' ? 'postgresql://orbit_app:fake@db:5432/orbit\n' : ''),
-    );
+    const env = loadEnv(DEPLOYED, deployedSecrets);
     expect(env.DATABASE_URL).toBe('postgresql://orbit_app:fake@db:5432/orbit');
+    expect(env.RATE_LIMIT_HMAC_KEY).toBe('file-only-rate-limit-key-0123456789abcdef');
+    expect(env.SMTP_PASSWORD).toBe('fake-smtp-password');
+    expect(env.MAIL_ALLOWLIST).toEqual(['@example.com', 'owner@example.org']);
+  });
+
+  it('requires the deployed services: public API URL, Sentry, encrypted and authenticated SMTP (PHASE-03)', () => {
+    const { API_PUBLIC_URL: _url, SENTRY_DSN: _dsn, SMTP_USER: _user, ...partial } = DEPLOYED;
+    try {
+      loadEnv({ ...partial, SMTP_SECURITY: 'none' }, deployedSecrets);
+      expect.unreachable();
+    } catch (error: unknown) {
+      const message = (error as Error).message;
+      for (const name of ['API_PUBLIC_URL', 'SENTRY_DSN', 'SMTP_SECURITY', 'SMTP_USER']) {
+        expect(message).toContain(name);
+      }
+    }
+    expect(() => loadEnv({ ...DEPLOYED, API_PUBLIC_URL: 'http://api.example.com' }, deployedSecrets)).toThrow(
+      /API_PUBLIC_URL/,
+    );
+  });
+
+  it('requires a mail allowlist in staging only', () => {
+    expect(() => loadEnv({ ...DEPLOYED, MAIL_ALLOWLIST: '' }, deployedSecrets)).toThrow(/MAIL_ALLOWLIST/);
+    const production = loadEnv({ ...DEPLOYED, APP_ENV: 'production', MAIL_ALLOWLIST: '' }, deployedSecrets);
+    expect(production.MAIL_ALLOWLIST).toEqual([]);
+  });
+
+  it('keeps local defaults for the new optional settings', () => {
+    const env = loadEnv(VALID, noSecretFile);
+    expect(env.APP_VERSION).toBe('dev');
+    expect(env.SMTP_SECURITY).toBe('none');
+    expect(env.SENTRY_DSN).toBeUndefined();
+    expect(env.API_PUBLIC_URL).toBeUndefined();
   });
 
   it('refuses the trace log level outside local and test', () => {
-    const { DATABASE_URL: _plain, ...rest } = VALID;
+    const { DATABASE_URL: _plain, RATE_LIMIT_HMAC_KEY: _key, ...rest } = VALID;
     expect(() =>
       loadEnv(
         {
@@ -69,6 +123,7 @@ describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
           NODE_ENV: 'production',
           LOG_LEVEL: 'trace',
           DATABASE_URL_FILE: '/x',
+          RATE_LIMIT_HMAC_KEY_FILE: '/run/secrets/rate_limit_hmac_key',
         },
         () => VALID.DATABASE_URL,
       ),
@@ -85,10 +140,16 @@ describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
     expect(() => loadEnv({ ...VALID, APP_ORIGIN: 'http://localhost:5173/app' }, noSecretFile)).toThrow(
       /APP_ORIGIN/,
     );
-    const { DATABASE_URL: _plain, ...rest } = VALID;
+    const { DATABASE_URL: _plain, RATE_LIMIT_HMAC_KEY: _key, ...rest } = VALID;
     expect(() =>
       loadEnv(
-        { ...rest, NODE_ENV: 'production', APP_ENV: 'production', DATABASE_URL_FILE: '/x' },
+        {
+          ...rest,
+          NODE_ENV: 'production',
+          APP_ENV: 'production',
+          DATABASE_URL_FILE: '/x',
+          RATE_LIMIT_HMAC_KEY_FILE: '/run/secrets/rate_limit_hmac_key',
+        },
         () => VALID.DATABASE_URL,
       ),
     ).toThrow(/APP_ORIGIN/);
@@ -139,31 +200,50 @@ describe('loadEnv (INFRASTRUCTURE.md §6.3)', () => {
   });
 
   it('refuses test-only hashing costs and a disabled response floor once deployed', () => {
-    const { DATABASE_URL: _plain, ...rest } = VALID;
+    const deployed = { ...DEPLOYED, APP_ENV: 'production' };
+
+    expect(() => loadEnv(deployed, deployedSecrets)).not.toThrow();
+    expect(() => loadEnv({ ...deployed, ARGON2_MEMORY_KIB: '1024' }, deployedSecrets)).toThrow(
+      /ARGON2_MEMORY_KIB/,
+    );
+    expect(() => loadEnv({ ...deployed, AUTH_UNIFORM_RESPONSE_MS: '0' }, deployedSecrets)).toThrow(
+      /AUTH_UNIFORM_RESPONSE_MS/,
+    );
+  });
+
+  it('requires the rate limit HMAC key and keeps abuse protections on once deployed', () => {
+    const { RATE_LIMIT_HMAC_KEY: _omitted, ...withoutKey } = VALID;
+    expect(() => loadEnv(withoutKey, noSecretFile)).toThrow(/RATE_LIMIT_HMAC_KEY/);
+    expect(() => loadEnv({ ...VALID, RATE_LIMIT_HMAC_KEY: 'too-short' }, noSecretFile)).toThrow(
+      /RATE_LIMIT_HMAC_KEY/,
+    );
+    expect(loadEnv({ ...VALID, RATE_LIMIT_ENABLED: 'false' }, noSecretFile).RATE_LIMIT_ENABLED).toBe(false);
+    const { DATABASE_URL: _plain, RATE_LIMIT_HMAC_KEY: _key, ...rest } = VALID;
     const deployed = {
       ...rest,
       NODE_ENV: 'production',
       APP_ENV: 'production',
       APP_ORIGIN: 'https://orbit.example.com',
       DATABASE_URL_FILE: '/run/secrets/database_url',
+      RATE_LIMIT_HMAC_KEY_FILE: '/run/secrets/rate_limit_hmac_key',
+      RATE_LIMIT_ENABLED: 'false',
     };
-    const readDatabaseUrl = (): string => VALID.DATABASE_URL;
-
-    expect(() => loadEnv(deployed, readDatabaseUrl)).not.toThrow();
-    expect(() => loadEnv({ ...deployed, ARGON2_MEMORY_KIB: '1024' }, readDatabaseUrl)).toThrow(
-      /ARGON2_MEMORY_KIB/,
-    );
-    expect(() => loadEnv({ ...deployed, AUTH_UNIFORM_RESPONSE_MS: '0' }, readDatabaseUrl)).toThrow(
-      /AUTH_UNIFORM_RESPONSE_MS/,
-    );
+    expect(() => loadEnv(deployed, () => VALID.DATABASE_URL)).toThrow(/RATE_LIMIT_ENABLED/);
   });
 
   it('reports an unreadable secret file without leaking its content', () => {
-    const { DATABASE_URL: _plain, ...rest } = VALID;
+    const { DATABASE_URL: _plain, RATE_LIMIT_HMAC_KEY: _key, ...rest } = VALID;
     expect(() =>
-      loadEnv({ ...rest, DATABASE_URL_FILE: '/missing' }, () => {
-        throw new Error('ENOENT: /missing');
-      }),
+      loadEnv(
+        {
+          ...rest,
+          DATABASE_URL_FILE: '/missing',
+          RATE_LIMIT_HMAC_KEY_FILE: '/run/secrets/rate_limit_hmac_key',
+        },
+        () => {
+          throw new Error('ENOENT: /missing');
+        },
+      ),
     ).toThrow(ConfigurationError);
   });
 });

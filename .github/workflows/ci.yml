@@ -56,6 +56,53 @@ jobs:
       - run: pnpm test:isolation
       - run: pnpm build
 
+  infrastructure:
+    name: images, scans and deployment configuration
+    runs-on: [self-hosted]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build the api and worker images (no push)
+        run: |
+          for target in api worker; do
+            docker build -f apps/api/Dockerfile --target "$target" --build-arg APP_VERSION="${GITHUB_SHA}" \
+              -t "orbit-ci-${target}:${GITHUB_SHA}" .
+          done
+      - name: Scan the images (HIGH and CRITICAL with a fix block)
+        run: |
+          for target in api worker; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.58.1 image \
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress "orbit-ci-${target}:${GITHUB_SHA}"
+          done
+      - name: Validate the Caddyfile
+        run: |
+          docker run --rm -v "$PWD/infra/caddy:/etc/caddy:ro" \
+            -e ACME_EMAIL=ops@example.com -e API_DOMAIN=api.example.com -e API_STAGING_DOMAIN=api-staging.example.com \
+            -e N8N_DOMAIN=n8n.example.com -e ADMIN_ALLOWED_CIDRS=203.0.113.0/24 \
+            caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Validate Compose files (only Caddy publishes ports, data network internal)
+        working-directory: infra/compose
+        run: |
+          cp ci-fixtures/compose.env ci-fixtures/n8n.env
+          for env in production staging; do
+            docker compose -f "compose.${env}.yml" --env-file ci-fixtures/compose.env config --format json |
+              node ../scripts/check-compose-ports.mjs
+          done
+      - name: Shellcheck the operations scripts
+        # La liste est construite sur l'hôte : l'image shellcheck n'a pas de shell pour développer les motifs.
+        run: |
+          mapfile -t files < <(ls infra/scripts/*.sh infra/provision/*.sh infra/compose/postgres/init-deployed/*.sh)
+          docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.10.0 -x "${files[@]}"
+      - name: Validate vercel.json (JSON and mandatory security headers)
+        run: |
+          node -e '
+            const c = require("./apps/web/vercel.json");
+            const h = c.headers.flatMap((r) => r.headers.map((x) => x.key));
+            for (const k of ["Content-Security-Policy", "Strict-Transport-Security", "X-Content-Type-Options"]) {
+              if (!h.includes(k)) throw new Error(`missing header ${k}`);
+            }
+            if (!c.rewrites.some((r) => r.has && r.destination.includes("api."))) throw new Error("production rewrite must be host-bound");'
+
   e2e:
     name: end-to-end smoke
     needs: quality

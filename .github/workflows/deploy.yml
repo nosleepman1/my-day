@@ -1,0 +1,126 @@
+# Déploiement (INFRASTRUCTURE.md §8.3, PHASE-03 T7-T8) : sur chaque `main` vert, image API poussée sur GHCR
+# et staging déployé automatiquement ; la production attend l'approbation du propriétaire (environnement
+# GitHub « production » avec « Required reviewers »), puis la branche `production` avance au même SHA, ce
+# qui déclenche le déploiement Vercel du front. La CI ne transporte aucun secret applicatif : seulement la
+# clé SSH de la commande forcée `orbit-deploy-wrapper` et le jeton GHCR du workflow.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  SHA: ${{ github.event.workflow_run.head_sha }}
+  IMAGE: ghcr.io/${{ github.repository_owner }}/orbit-api
+
+jobs:
+  images:
+    name: build and push the API image
+    # Uniquement un push sur `main` du dépôt lui-même : jamais une PR ni un fork (revue PHASE-03, H3).
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_branch == 'main'
+      && github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: [self-hosted]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.SHA }}
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+      - name: Build and push api and worker (tag = commit SHA, never latest)
+        env:
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          image="$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')"
+          for target in api worker; do
+            tag="${image}:${SHA}"
+            [[ "$target" == worker ]] && tag="${image}-worker:${SHA}"
+            docker build -f apps/api/Dockerfile --target "$target" \
+              --build-arg APP_VERSION="$SHA" \
+              --build-arg SOURCE_URL="$SOURCE_URL" \
+              -t "$tag" .
+            docker push "$tag"
+          done
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io
+
+  staging:
+    name: deploy staging
+    needs: images
+    runs-on: [self-hosted]
+    timeout-minutes: 20
+    environment: staging
+    steps:
+      - name: orbit-deploy staging (migrations, up, smoke tests on the VPS)
+        env:
+          SSH_KEY: ${{ secrets.VPS_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_HOST: ${{ vars.VPS_HOST }}
+        run: |
+          key="$(mktemp)"; trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SSH_KEY" >"$key"; chmod 600 "$key"
+          printf '%s\n' "$KNOWN_HOSTS" >"$RUNNER_TEMP/known_hosts"
+          ssh -i "$key" -o UserKnownHostsFile="$RUNNER_TEMP/known_hosts" -o StrictHostKeyChecking=yes \
+            "deploy@${VPS_HOST}" "staging ${SHA}"
+
+  production:
+    name: deploy production (manual approval)
+    needs: staging
+    runs-on: [self-hosted]
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+      - name: orbit-deploy production (pre-migration backup, migrations, up, smoke tests)
+        env:
+          SSH_KEY: ${{ secrets.VPS_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_HOST: ${{ vars.VPS_HOST }}
+        run: |
+          key="$(mktemp)"; trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SSH_KEY" >"$key"; chmod 600 "$key"
+          printf '%s\n' "$KNOWN_HOSTS" >"$RUNNER_TEMP/known_hosts"
+          ssh -i "$key" -o UserKnownHostsFile="$RUNNER_TEMP/known_hosts" -o StrictHostKeyChecking=yes \
+            "deploy@${VPS_HOST}" "production ${SHA}"
+      - name: Advance the production branch (fast-forward only) so Vercel deploys the front
+        run: git push origin "${SHA}:refs/heads/production"
+      - name: Wait for the production front to serve this version
+        env:
+          APP_ORIGIN: ${{ vars.PRODUCTION_APP_ORIGIN }}
+        run: |
+          for attempt in $(seq 1 40); do
+            if curl -fsS -m 10 "${APP_ORIGIN}/" | grep -q "name=\"orbit-version\" content=\"${SHA}\""; then
+              echo "front serves ${SHA}"; exit 0
+            fi
+            sleep 15
+          done
+          echo "the production front does not serve ${SHA} after 10 minutes" >&2
+          exit 1

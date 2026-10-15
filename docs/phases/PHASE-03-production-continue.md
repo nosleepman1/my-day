@@ -1,6 +1,6 @@
 # PHASE-03 : Production continue
 
-- **Statut :** À faire
+- **Statut :** Préparée côté code ; mise en ligne en attente du propriétaire (voir `progress/PHASE-03-REPORT.md`)
 - **Dépend de :** PHASE-02
 - **Accès :** ADMIN (exploitation de la plateforme ; aucune fonctionnalité utilisateur nouvelle)
 - **Estimation :** 5 à 7 jours effectifs (Vercel et n8n inclus, ADR-038)
