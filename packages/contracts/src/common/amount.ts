@@ -51,3 +51,4 @@ export const CurrencyCodeSchema = z.enum([
   'SAR',
 ]);
 export type CurrencyCodeValue = z.infer<typeof CurrencyCodeSchema>;
+export type CurrencyCode = CurrencyCodeValue;
