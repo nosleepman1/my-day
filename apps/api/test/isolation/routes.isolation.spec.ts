@@ -181,6 +181,7 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
   type FinanceFixture = Readonly<{
     account: string;
     category: string;
+    counterparty: string;
   }>;
 
   async function financeFixture(owner: SignedInUser): Promise<FinanceFixture> {
@@ -195,7 +196,11 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       kind: 'EXPENSE',
       defaultEconomicClass: 'EXPENSE_OPERATING',
     });
-    return { account, category };
+    const counterparty = await createAs(owner, '/finance/counterparties', {
+      name: `Contrepartie ${randomUUID().slice(0, 8)}`,
+      kind: 'PERSON',
+    });
+    return { account, category, counterparty };
   }
 
   type FinanceCase = Readonly<{
@@ -228,6 +233,29 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       body: () => ({ name: 'Nouveau nom catégorie' }),
     }),
     'DELETE /api/v1/finance/categories/:id': atFinance('delete', (f) => `/finance/categories/${f.category}`),
+    'GET /api/v1/finance/counterparties/:id': atFinance(
+      'get',
+      (f) => `/finance/counterparties/${f.counterparty}`,
+    ),
+    'PATCH /api/v1/finance/counterparties/:id': atFinance(
+      'patch',
+      (f) => `/finance/counterparties/${f.counterparty}`,
+      {
+        body: () => ({ name: 'Nouveau nom contrepartie' }),
+      },
+    ),
+    'POST /api/v1/finance/counterparties/:id/archive': atFinance(
+      'post',
+      (f) => `/finance/counterparties/${f.counterparty}/archive`,
+    ),
+    'POST /api/v1/finance/counterparties/:id/unarchive': atFinance(
+      'post',
+      (f) => `/finance/counterparties/${f.counterparty}/unarchive`,
+    ),
+    'DELETE /api/v1/finance/counterparties/:id': atFinance(
+      'delete',
+      (f) => `/finance/counterparties/${f.counterparty}`,
+    ),
   };
 
   function financeCase(spec: FinanceCase): CrossUserCase {

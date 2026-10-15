@@ -147,21 +147,21 @@ describe('finance contracts', () => {
   });
 
   describe('counterparties schemas', () => {
-    it('validates counterparty creation with default type OTHER', () => {
+    it('validates counterparty creation with default kind PERSON', () => {
       const parsed = CreateCounterpartySchema.parse({
         name: 'Boulangerie du Coin',
       });
       expect(parsed.name).toBe('Boulangerie du Coin');
-      expect(parsed.type).toBe('OTHER');
+      expect(parsed.kind).toBe('PERSON');
     });
 
     it('validates UpdateCounterpartySchema', () => {
       const parsed = UpdateCounterpartySchema.parse({
         name: 'Boulangerie Artisanale',
-        type: 'MERCHANT',
+        kind: 'ORGANIZATION',
       });
       expect(parsed.name).toBe('Boulangerie Artisanale');
-      expect(parsed.type).toBe('MERCHANT');
+      expect(parsed.kind).toBe('ORGANIZATION');
     });
 
     it('validates MergeCounterpartySchema', () => {
