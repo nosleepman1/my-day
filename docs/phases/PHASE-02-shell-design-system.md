@@ -1,6 +1,6 @@
 # PHASE-02 : Shell de l'application et design system
 
-- **Statut :** À faire
+- **Statut :** En cours, quasi terminée (voir `progress/PHASE-02-REPORT.md`)
 - **Dépend de :** PHASE-01
 - **Accès :** Tous
 - **Estimation :** 5 à 7 jours effectifs
