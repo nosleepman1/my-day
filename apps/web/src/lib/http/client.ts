@@ -37,6 +37,8 @@ export type RequestOptions = Readonly<{
   body?: unknown;
   /** UUIDv7 client, obligatoire sur les créations financières et le rejeu hors ligne (FRONTEND.md §3.1). */
   idempotencyKey?: string;
+  /** Version attendue (API.md §10) : envoyée en `If-Match: W/"<version>"`. */
+  ifMatch?: number;
   signal?: AbortSignal;
   timeoutMs?: number;
 }>;
@@ -50,6 +52,7 @@ function buildHeaders(options: RequestOptions): Headers {
   const headers = new Headers({ Accept: 'application/json', 'X-Requested-With': 'orbit' });
   if (options.body !== undefined) headers.set('Content-Type', 'application/json');
   if (options.idempotencyKey !== undefined) headers.set('Idempotency-Key', options.idempotencyKey);
+  if (options.ifMatch !== undefined) headers.set('If-Match', `W/"${options.ifMatch}"`);
   return headers;
 }
 
