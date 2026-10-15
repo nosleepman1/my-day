@@ -66,6 +66,37 @@ function stampOwner(data: unknown, userId: string, operation: string): Clause {
   return { ...row, userId };
 }
 
+/**
+ * Écritures imbriquées sur une relation (`connect`, `create`…) : elles échapperaient au cloisonnement,
+ * qui ne réécrit que la racine de l'opération. Seules les FK composites les arrêteraient ; on les refuse
+ * dès l'appel (revue sécurité PHASE-04, M5). `set`, `increment`… restent permis sur les scalaires.
+ */
+const NESTED_WRITES: ReadonlySet<string> = new Set([
+  'connect',
+  'connectOrCreate',
+  'create',
+  'createMany',
+  'upsert',
+  'disconnect',
+  'delete',
+  'deleteMany',
+  'update',
+  'updateMany',
+]);
+
+function assertNoNestedWrites(data: unknown, operation: string): void {
+  const rows: unknown[] = Array.isArray(data) ? data : [data];
+  for (const row of rows) {
+    for (const value of Object.values(asClause(row))) {
+      if (typeof value !== 'object' || value === null || value instanceof Date || Array.isArray(value))
+        continue;
+      if (Object.keys(value).some((key) => NESTED_WRITES.has(key))) {
+        throw new TenantScopeViolationError(`${operation} contains a nested relation write`);
+      }
+    }
+  }
+}
+
 function assertNoOwnerChange(data: unknown, operation: string): void {
   if ('userId' in asClause(data)) throw new TenantScopeViolationError(`${operation} changes userId`);
 }
@@ -79,6 +110,13 @@ export function scopeArgs(operation: string, args: Args, userId: string): Args {
     throw new TenantScopeViolationError(`${operation} is forbidden: use findFirst({ where: { id } })`);
   }
   if (UPDATE_OPERATIONS.has(operation)) assertNoOwnerChange(args['data'], operation);
+  if (UPDATE_OPERATIONS.has(operation) || CREATE_OPERATIONS.has(operation)) {
+    assertNoNestedWrites(args['data'], operation);
+  }
+  if (operation === 'upsert') {
+    assertNoNestedWrites(args['create'], operation);
+    assertNoNestedWrites(args['update'], operation);
+  }
   if (FILTER_OPERATIONS.has(operation)) return { ...args, where: filterWhere(args['where'], userId) };
   if (UNIQUE_OPERATIONS.has(operation))
     return { ...args, where: uniqueWhere(args['where'], userId, operation) };
