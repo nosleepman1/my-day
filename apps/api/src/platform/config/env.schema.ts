@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
 /** Secrets qui, hors `local` et `test`, doivent venir d'un fichier monté `<NOM>_FILE` (INFRASTRUCTURE.md §7). */
-const SECRET_KEYS = ['DATABASE_URL'] as const;
+const SECRET_KEYS = ['DATABASE_URL', 'RATE_LIMIT_HMAC_KEY', 'SMTP_PASSWORD'] as const;
 const DEPLOYED_ENVS: ReadonlySet<string> = new Set(['staging', 'production']);
 const MIN_DEPLOYED_ARGON2_MEMORY_KIB = 19_456;
 
@@ -23,6 +23,38 @@ function checkAppOrigin(appOrigin: string, appEnv: string, ctx: IssueContext): v
   const isSecureEnough = url.protocol === 'https:' || !DEPLOYED_ENVS.has(appEnv);
   if (!isOriginOnly || !isSecureEnough) {
     ctx.addIssue({ code: 'custom', path: ['APP_ORIGIN'], message: 'must be an https origin without path' });
+  }
+}
+
+type DeployedFields = Readonly<{
+  APP_ENV: string;
+  API_PUBLIC_URL?: string | undefined;
+  SENTRY_DSN?: string | undefined;
+  SMTP_SECURITY: string;
+  SMTP_USER?: string | undefined;
+  SMTP_PASSWORD?: string | undefined;
+  MAIL_ALLOWLIST: readonly string[];
+}>;
+
+/**
+ * Exigences propres aux environnements déployés (PHASE-03) : URL publique HTTPS de l'API, Sentry, SMTP
+ * chiffré et authentifié (revue PHASE-01, M8) et, en staging, liste blanche des destinataires.
+ */
+function checkDeployedServices(env: DeployedFields, ctx: IssueContext): void {
+  if (!DEPLOYED_ENVS.has(env.APP_ENV)) return;
+  const missing = (path: string, message: string): void => {
+    ctx.addIssue({ code: 'custom', path: [path], message });
+  };
+  if (env.API_PUBLIC_URL?.startsWith('https://') !== true) {
+    missing('API_PUBLIC_URL', 'an https URL is required once deployed');
+  }
+  if (env.SENTRY_DSN === undefined) missing('SENTRY_DSN', 'required once deployed');
+  if (env.SMTP_SECURITY === 'none') missing('SMTP_SECURITY', 'encrypted SMTP is required once deployed');
+  if (env.SMTP_USER === undefined || env.SMTP_PASSWORD === undefined) {
+    missing('SMTP_USER', 'SMTP credentials are required once deployed');
+  }
+  if (env.APP_ENV === 'staging' && env.MAIL_ALLOWLIST.length === 0) {
+    missing('MAIL_ALLOWLIST', 'staging only sends to allowlisted recipients');
   }
 }
 
@@ -69,11 +101,31 @@ export const EnvSchema = z
     DATABASE_URL: z.string().regex(/^postgres(?:ql)?:\/\//, 'must be a PostgreSQL connection URL'),
     /** Nombre de proxys de confiance devant l'API (Caddy, réécriture Vercel). */
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
-    /** PHASE-01 : SMTP uniquement (Mailpit en local et en test) ; `brevo`/`resend` en PHASE-03. */
+    /** URL publique directe de l'API (webhooks entrants, n8n) ; jamais utilisée par le navigateur. */
+    API_PUBLIC_URL: z.url({ protocol: /^https?$/ }).optional(),
+    /** SHA de l'image déployée, journalisé au démarrage et transmis à Sentry ; jamais exposé par HTTP. */
+    APP_VERSION: z
+      .string()
+      .regex(/^[\w.-]{1,64}$/)
+      .default('dev'),
+    /** Projet Sentry SaaS « api » (région UE) ; absent en local et en test. */
+    SENTRY_DSN: z.url({ protocol: /^https$/ }).optional(),
+    SENTRY_ENVIRONMENT: z.string().min(1).max(32).optional(),
+    /**
+     * SMTP partout (Mailpit en local, relais SMTP du fournisseur transactionnel en déploiement, ADR-042) :
+     * un seul adaptateur, testé de bout en bout.
+     */
     MAIL_DRIVER: z.enum(['smtp']).default('smtp'),
     /** IP plutôt que `localhost` : nodemailer résout lui-même le nom, ce qui expire parfois sous Windows. */
     SMTP_HOST: z.string().min(1).default('127.0.0.1'),
     SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(1025),
+    /** `none` (Mailpit), `starttls` (port 587) ou `tls` (port 465) ; chiffré obligatoire en déploiement. */
+    SMTP_SECURITY: z.enum(['none', 'starttls', 'tls']).default('none'),
+    SMTP_USER: z.string().min(1).optional(),
+    /** Secret (`SMTP_PASSWORD_FILE` en déploiement). */
+    SMTP_PASSWORD: z.string().min(1).optional(),
+    /** Staging : destinataires autorisés (adresses ou `@domaine`) ; tout autre envoi est refusé. */
+    MAIL_ALLOWLIST: z.string().default('').transform(splitAddressList),
     /** Expéditeur, par exemple `ORBIT <no-reply@orbit.example.com>` ; une seule ligne (aucune injection d'en-tête). */
     MAIL_FROM: z
       .string()
@@ -91,11 +143,28 @@ export const EnvSchema = z
     /** SECURITY.md §3.2 : inactivité glissante et durée absolue des sessions. */
     SESSION_IDLE_DAYS: z.coerce.number().int().min(1).max(30).default(7),
     SESSION_ABSOLUTE_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+    /** Secret : pseudonymisation HMAC des IP et adresses dans les compteurs (SECURITY.md §3.7). */
+    RATE_LIMIT_HMAC_KEY: z.string().min(32),
+    /** Désactivable dans les tests uniquement (refusé en déploiement). */
+    RATE_LIMIT_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((value) => value === 'true'),
+    /** Délai progressif par échec de connexion récent (SECURITY.md §3.7) ; 0 dans les tests. */
+    LOGIN_DELAY_UNIT_MS: z.coerce.number().int().min(0).max(1_000).default(250),
   })
   .superRefine((env, ctx) => {
     checkEnvironmentPair(env.NODE_ENV, env.APP_ENV, ctx);
     checkAppOrigin(env.APP_ORIGIN, env.APP_ENV, ctx);
     checkDeployedAuthCosts(env.ARGON2_MEMORY_KIB, env.AUTH_UNIFORM_RESPONSE_MS, env.APP_ENV, ctx);
+    checkDeployedServices(env, ctx);
+    if (DEPLOYED_ENVS.has(env.APP_ENV) && (!env.RATE_LIMIT_ENABLED || env.LOGIN_DELAY_UNIT_MS === 0)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['RATE_LIMIT_ENABLED'],
+        message: 'abuse protections cannot be disabled once deployed',
+      });
+    }
     if (env.SESSION_IDLE_DAYS > env.SESSION_ABSOLUTE_DAYS) {
       ctx.addIssue({
         code: 'custom',
