@@ -61,6 +61,21 @@ const CONSTRAINTS = [
   'ck_ledger_entries__amount_positive',
   'ck_idempotency_keys__completed',
   'ck_projects__budget',
+  // PHASE-06 (M05)
+  'ck_debts__principal_positive',
+  'ck_debts__due',
+  'ck_debts__closing',
+  'ck_debt_repayments__amount_positive',
+  'ck_recurring_transactions__type',
+  'ck_recurring_transactions__amount_positive',
+  'ck_recurring_transactions__transfer',
+  'ck_recurring_transactions__reminder_days',
+  'ck_recurring_transactions__economic_class',
+  'ck_recurring_transactions__recurrence_syntax',
+  'ck_recurring_occurrences__amount_positive',
+  'ck_recurring_occurrences__confirmed',
+  'ck_recurring_occurrences__skipped',
+  'ck_transactions__debt_link',
 ];
 const INDEXES = [
   'ux_users__single_admin',
@@ -100,6 +115,12 @@ const INDEXES = [
   'ix_transactions__description_trgm',
   'ux_note_links__transaction',
   'ux_note_links__counterparty',
+  // PHASE-06 (M05)
+  'ix_debts__open',
+  'ix_recurring_transactions__next',
+  'ux_recurring_occurrences__transaction',
+  'ix_recurring_occurrences__expected',
+  'ux_note_links__debt',
 ];
 const TRIGGERS = [
   'trg_task_dependencies__no_cycle',
@@ -113,6 +134,9 @@ const TRIGGERS = [
   'trg_ledger_entries__guard',
   'trg_transactions__entries_shape',
   'trg_ledger_entries__entries_shape',
+  // PHASE-06 (M05)
+  'trg_debts__guard',
+  'trg_debt_repayments__guard',
 ];
 
 const AUDIT_ID = '0192f1c3-7a2b-7c1e-9d0f-3b4c5d6e7f81';

@@ -120,6 +120,7 @@ describe('TransfersService', () => {
     projectId: null,
     parentTransactionId: null,
     refundOfId: null,
+    debtId: null,
     rate: null,
     rateDate: null,
     rateSource: null,

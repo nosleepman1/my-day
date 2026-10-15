@@ -119,5 +119,28 @@ Objets que Prisma ne sait pas exprimer, écrits à la main dans les migrations (
 | `ux_note_links__transaction` | index unique partiel | note_links | 20261015000000_phase05_finance_core |
 | `ux_note_links__counterparty` | index unique partiel | note_links | 20261015000000_phase05_finance_core |
 | `orbit_forbid_log_mutation()` : `search_path` figé | fonction | — | 20261015000000_phase05_finance_core |
+| `ck_debts__principal_positive` | CHECK | debts | 20261016000000_phase06_debts_recurring |
+| `ck_debts__due` | CHECK | debts | 20261016000000_phase06_debts_recurring |
+| `ck_debts__closing` | CHECK | debts | 20261016000000_phase06_debts_recurring |
+| `ix_debts__open` | index partiel | debts | 20261016000000_phase06_debts_recurring |
+| `orbit_debts_guard()` | fonction | — | 20261016000000_phase06_debts_recurring |
+| `trg_debts__guard` | déclencheur (garde transitions, fige champs, interdit suppression) | debts | 20261016000000_phase06_debts_recurring |
+| `ck_debt_repayments__amount_positive` | CHECK | debt_repayments | 20261016000000_phase06_debts_recurring |
+| `orbit_debt_repayments_guard()` | fonction | — | 20261016000000_phase06_debts_recurring |
+| `trg_debt_repayments__guard` | déclencheur (contrôle transaction, classe économique, plafond d'imputation) | debt_repayments | 20261016000000_phase06_debts_recurring |
+| `ck_recurring_transactions__type` | CHECK | recurring_transactions | 20261016000000_phase06_debts_recurring |
+| `ck_recurring_transactions__amount_positive` | CHECK | recurring_transactions | 20261016000000_phase06_debts_recurring |
+| `ck_recurring_transactions__transfer` | CHECK | recurring_transactions | 20261016000000_phase06_debts_recurring |
+| `ck_recurring_transactions__reminder_days` | CHECK | recurring_transactions | 20261016000000_phase06_debts_recurring |
+| `ck_recurring_transactions__economic_class` | CHECK | recurring_transactions | 20261016000000_phase06_debts_recurring |
+| `ck_recurring_transactions__recurrence_syntax` | CHECK | recurring_transactions | 20261016000000_phase06_debts_recurring |
+| `ix_recurring_transactions__next` | index partiel | recurring_transactions | 20261016000000_phase06_debts_recurring |
+| `ck_recurring_occurrences__amount_positive` | CHECK | recurring_occurrences | 20261016000000_phase06_debts_recurring |
+| `ck_recurring_occurrences__confirmed` | CHECK | recurring_occurrences | 20261016000000_phase06_debts_recurring |
+| `ck_recurring_occurrences__skipped` | CHECK | recurring_occurrences | 20261016000000_phase06_debts_recurring |
+| `ux_recurring_occurrences__transaction` | index unique partiel | recurring_occurrences | 20261016000000_phase06_debts_recurring |
+| `ix_recurring_occurrences__expected` | index partiel | recurring_occurrences | 20261016000000_phase06_debts_recurring |
+| `ck_transactions__debt_link` | CHECK | transactions | 20261016000000_phase06_debts_recurring |
+| `ux_note_links__debt` | index unique partiel | note_links | 20261016000000_phase06_debts_recurring |
 
 `prisma migrate diff` signale toujours deux écarts attendus : les index BRIN (Prisma ne les modélise pas avec un nom fixe) et les trois FK `SET NULL (colonne)` (Prisma ne connaît que `SET NULL` sur toutes les colonnes, ce qui effacerait `user_id`). Toute migration générée doit être relue pour retirer les `DROP INDEX …_brin` et la réécriture de ces FK.

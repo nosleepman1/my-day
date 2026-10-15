@@ -140,6 +140,10 @@ model User {
   cancelledTransactions   Transaction[]           @relation("CancelledTransactions")
   ledgerEntries           LedgerEntry[]
   idempotencyKeys         IdempotencyKey[]
+  debts                   Debt[]
+  debtRepayments          DebtRepayment[]
+  recurringTransactions   RecurringTransaction[]
+  recurringOccurrences    RecurringOccurrence[]
 
   @@index([status, createdAt], map: "ix_users__status_created")
   @@map("users")
@@ -397,8 +401,9 @@ model Project {
   sourceIdeas  Idea[]        @relation("IdeaConvertedProject")
   tasks        Task[]
   tags         ProjectTag[]
-  noteLinks    NoteLink[]
-  transactions Transaction[]
+  noteLinks             NoteLink[]
+  transactions          Transaction[]
+  recurringTransactions RecurringTransaction[]
 
   @@unique([userId, id])
   @@map("projects")
@@ -582,6 +587,7 @@ model NoteLink {
   taskId         String?  @map("task_id") @db.Uuid
   transactionId  String?  @map("transaction_id") @db.Uuid
   counterpartyId String?  @map("counterparty_id") @db.Uuid
+  debtId         String?  @map("debt_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user         User          @relation(fields: [userId], references: [id], onDelete: NoAction)
@@ -591,6 +597,7 @@ model NoteLink {
   task         Task?         @relation(fields: [userId, taskId], references: [userId, id], onDelete: Cascade)
   transaction  Transaction?  @relation(fields: [userId, transactionId], references: [userId, id], onDelete: Cascade)
   counterparty Counterparty? @relation(fields: [userId, counterpartyId], references: [userId, id], onDelete: Cascade)
+  debt         Debt?         @relation(fields: [userId, debtId], references: [userId, id], onDelete: Cascade)
 
   @@unique([userId, id])
   @@index([userId, noteId], map: "ix_note_links__note")
@@ -708,11 +715,14 @@ model Currency {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  financialAccounts FinancialAccount[]
-  transactions      Transaction[]
-  ledgerEntries     LedgerEntry[]
-  userPreferences   UserPreference[]
-  projects          Project[]
+  financialAccounts     FinancialAccount[]
+  transactions          Transaction[]
+  ledgerEntries         LedgerEntry[]
+  userPreferences       UserPreference[]
+  projects              Project[]
+  debts                 Debt[]
+  recurringTransactions RecurringTransaction[]
+  recurringOccurrences  RecurringOccurrence[]
 
   @@map("currencies")
 }
@@ -738,9 +748,11 @@ model FinancialAccount {
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user          User          @relation(fields: [userId], references: [id], onDelete: NoAction)
-  currencyRel   Currency      @relation(fields: [currency], references: [code], onDelete: NoAction)
-  ledgerEntries LedgerEntry[]
+  user                             User                   @relation(fields: [userId], references: [id], onDelete: NoAction)
+  currencyRel                      Currency               @relation(fields: [currency], references: [code], onDelete: NoAction)
+  ledgerEntries                    LedgerEntry[]
+  recurringTransactionsSource      RecurringTransaction[] @relation("RecurringSourceAccount")
+  recurringTransactionsDestination RecurringTransaction[] @relation("RecurringDestinationAccount")
 
   @@unique([userId, id])
   @@unique([userId, id, currency])
@@ -765,10 +777,11 @@ model TransactionCategory {
   createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user         User                  @relation(fields: [userId], references: [id], onDelete: NoAction)
-  parent       TransactionCategory?  @relation("CategoryHierarchy", fields: [userId, parentId], references: [userId, id], onDelete: NoAction)
-  children     TransactionCategory[] @relation("CategoryHierarchy")
-  transactions Transaction[]
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: NoAction)
+  parent                TransactionCategory?   @relation("CategoryHierarchy", fields: [userId, parentId], references: [userId, id], onDelete: NoAction)
+  children              TransactionCategory[]  @relation("CategoryHierarchy")
+  transactions          Transaction[]
+  recurringTransactions RecurringTransaction[]
 
   @@unique([userId, id])
   @@unique([userId, systemKey])
@@ -789,9 +802,11 @@ model Counterparty {
   createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: NoAction)
-  transactions Transaction[]
-  noteLinks    NoteLink[]
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: NoAction)
+  transactions          Transaction[]
+  noteLinks             NoteLink[]
+  debts                 Debt[]
+  recurringTransactions RecurringTransaction[]
 
   @@unique([userId, id])
   @@index([userId, name], map: "ix_counterparties__active")
@@ -816,6 +831,7 @@ model Transaction {
   projectId           String?            @map("project_id") @db.Uuid
   parentTransactionId String?            @map("parent_transaction_id") @db.Uuid
   refundOfId          String?            @map("refund_of_id") @db.Uuid
+  debtId              String?            @map("debt_id") @db.Uuid
   rate                Decimal?           @db.Decimal(20, 10)
   rateDate            DateTime?          @map("rate_date") @db.Date
   rateSource          FxRateSource?      @map("rate_source")
@@ -829,18 +845,21 @@ model Transaction {
   createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user              User                 @relation(fields: [userId], references: [id], onDelete: NoAction)
-  currencyRel       Currency             @relation(fields: [currency], references: [code], onDelete: NoAction)
-  category          TransactionCategory? @relation(fields: [userId, categoryId], references: [userId, id], onDelete: NoAction)
-  counterparty      Counterparty?        @relation(fields: [userId, counterpartyId], references: [userId, id], onDelete: NoAction)
-  project           Project?             @relation(fields: [userId, projectId], references: [userId, id], onDelete: NoAction)
-  parentTransaction Transaction?         @relation("FeeTransactions", fields: [userId, parentTransactionId], references: [userId, id], onDelete: NoAction)
-  feeTransactions   Transaction[]        @relation("FeeTransactions")
-  refundOf          Transaction?         @relation("RefundTransactions", fields: [userId, refundOfId, currency], references: [userId, id, currency], onDelete: NoAction)
-  refunds           Transaction[]        @relation("RefundTransactions")
-  cancelledByUser   User?                @relation("CancelledTransactions", fields: [cancelledBy], references: [id], onDelete: NoAction)
-  ledgerEntries     LedgerEntry[]
-  noteLinks         NoteLink[]
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: NoAction)
+  currencyRel          Currency             @relation(fields: [currency], references: [code], onDelete: NoAction)
+  category             TransactionCategory? @relation(fields: [userId, categoryId], references: [userId, id], onDelete: NoAction)
+  counterparty         Counterparty?        @relation(fields: [userId, counterpartyId], references: [userId, id], onDelete: NoAction)
+  project              Project?             @relation(fields: [userId, projectId], references: [userId, id], onDelete: NoAction)
+  parentTransaction    Transaction?         @relation("FeeTransactions", fields: [userId, parentTransactionId], references: [userId, id], onDelete: NoAction)
+  feeTransactions      Transaction[]        @relation("FeeTransactions")
+  refundOf             Transaction?         @relation("RefundTransactions", fields: [userId, refundOfId, currency], references: [userId, id, currency], onDelete: NoAction)
+  refunds              Transaction[]        @relation("RefundTransactions")
+  cancelledByUser      User?                @relation("CancelledTransactions", fields: [cancelledBy], references: [id], onDelete: NoAction)
+  debtOrigin           Debt?                @relation("DebtOriginTransaction", fields: [userId, debtId], references: [userId, id], onDelete: NoAction)
+  debtRepayments       DebtRepayment[]
+  recurringOccurrences RecurringOccurrence[]
+  ledgerEntries        LedgerEntry[]
+  noteLinks            NoteLink[]
 
   @@unique([userId, id])
   @@unique([userId, id, currency])
@@ -851,6 +870,7 @@ model Transaction {
   @@index([userId, projectId], map: "ix_transactions__project")
   @@index([userId, parentTransactionId], map: "ix_transactions__parent")
   @@index([userId, refundOfId], map: "ix_transactions__refund_of")
+  @@index([userId, debtId], map: "ix_transactions__debt")
   @@index([userId, externalReference], map: "ix_transactions__external_ref")
   @@map("transactions")
 }
@@ -898,4 +918,166 @@ model IdempotencyKey {
   @@unique([userId, scope, key])
   @@index([expiresAt], map: "ix_idempotency_keys__expires")
   @@map("idempotency_keys")
+}
+
+// =============================================================================
+// M05 : Dettes, créances, récurrences et prévisions (PHASE-06)
+// =============================================================================
+
+enum DebtType {
+  PAYABLE
+  RECEIVABLE
+
+  @@map("debt_type")
+}
+
+enum DebtStatus {
+  OPEN
+  CANCELLED
+  WRITTEN_OFF
+
+  @@map("debt_status")
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+
+  @@map("recurring_status")
+}
+
+enum RecurringGenerationMode {
+  CONFIRM
+  AUTO_PENDING
+
+  @@map("recurring_generation_mode")
+}
+
+enum OccurrenceStatus {
+  EXPECTED
+  CONFIRMED
+  SKIPPED
+
+  @@map("occurrence_status")
+}
+
+/// Dettes (PAYABLE) et créances (RECEIVABLE) selon DATA_MODEL.md §3.5 (M05).
+model Debt {
+  id             String      @id @db.Uuid
+  userId         String      @map("user_id") @db.Uuid
+  type           DebtType
+  counterpartyId String      @map("counterparty_id") @db.Uuid
+  title          String      @db.VarChar(160)
+  description    String?
+  principalMinor BigInt      @map("principal_minor")
+  currency       String      @db.Char(3)
+  openedOn       DateTime    @map("opened_on") @db.Date
+  dueDate        DateTime?   @map("due_date") @db.Date
+  status         DebtStatus  @default(OPEN)
+  cancelledAt    DateTime?   @map("cancelled_at") @db.Timestamptz(6)
+  writtenOffAt   DateTime?   @map("written_off_at") @db.Timestamptz(6)
+  closingReason  String?     @map("closing_reason") @db.VarChar(500)
+  notes          String?
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user               User            @relation(fields: [userId], references: [id], onDelete: NoAction)
+  counterparty       Counterparty    @relation(fields: [userId, counterpartyId], references: [userId, id], onDelete: NoAction)
+  currencyRel        Currency        @relation(fields: [currency], references: [code], onDelete: NoAction)
+  repayments         DebtRepayment[]
+  originTransactions Transaction[]   @relation("DebtOriginTransaction")
+  noteLinks          NoteLink[]
+
+  @@unique([userId, id])
+  @@unique([userId, id, currency])
+  @@index([userId, counterpartyId], map: "ix_debts__counterparty")
+  @@map("debts")
+}
+
+/// Imputations de remboursements de dettes selon DATA_MODEL.md §3.5 (M05).
+model DebtRepayment {
+  id            String   @id @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  debtId        String   @map("debt_id") @db.Uuid
+  transactionId String   @map("transaction_id") @db.Uuid
+  amountMinor   BigInt   @map("amount_minor")
+  currency      String   @db.Char(3)
+  notes         String?  @db.VarChar(500)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: NoAction)
+  debt        Debt        @relation(fields: [userId, debtId, currency], references: [userId, id, currency], onDelete: NoAction)
+  transaction Transaction @relation(fields: [userId, transactionId, currency], references: [userId, id, currency], onDelete: NoAction)
+
+  @@unique([userId, id])
+  @@unique([userId, debtId, transactionId])
+  @@unique([userId, transactionId])
+  @@index([userId, debtId], map: "ix_debt_repayments__debt")
+  @@map("debt_repayments")
+}
+
+/// Règles de transactions récurrentes selon DATA_MODEL.md §3.5 (M05).
+model RecurringTransaction {
+  id                   String                  @id @db.Uuid
+  userId               String                  @map("user_id") @db.Uuid
+  name                 String                  @db.VarChar(120)
+  type                 TransactionType
+  economicClass        EconomicClass           @map("economic_class")
+  amountMinor          BigInt                  @map("amount_minor")
+  currency             String                  @db.Char(3)
+  accountId            String                  @map("account_id") @db.Uuid
+  destinationAccountId String?                 @map("destination_account_id") @db.Uuid
+  categoryId           String?                 @map("category_id") @db.Uuid
+  counterpartyId       String?                 @map("counterparty_id") @db.Uuid
+  projectId            String?                 @map("project_id") @db.Uuid
+  generationMode       RecurringGenerationMode @default(CONFIRM) @map("generation_mode")
+  reminderDaysBefore   Int                     @default(1) @map("reminder_days_before") @db.SmallInt
+  status               RecurringStatus         @default(ACTIVE)
+  recurrenceRule       String                  @map("recurrence_rule") @db.VarChar(500)
+  recurrenceAnchorOn   DateTime                @map("recurrence_anchor_on") @db.Date
+  recurrenceTimezone   String                  @map("recurrence_timezone") @db.VarChar(60)
+  recurrenceLocalTime  DateTime?               @map("recurrence_local_time") @db.Time(6)
+  nextOccurrenceAt     DateTime?               @map("next_occurrence_at") @db.Timestamptz(6)
+  generatedUntil       DateTime?               @map("generated_until") @db.Date
+  notes                String?
+  createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user               User                  @relation(fields: [userId], references: [id], onDelete: NoAction)
+  currencyRel        Currency              @relation(fields: [currency], references: [code], onDelete: NoAction)
+  account            FinancialAccount      @relation("RecurringSourceAccount", fields: [userId, accountId, currency], references: [userId, id, currency], onDelete: NoAction)
+  destinationAccount FinancialAccount?     @relation("RecurringDestinationAccount", fields: [userId, destinationAccountId], references: [userId, id], onDelete: NoAction)
+  category           TransactionCategory?  @relation(fields: [userId, categoryId], references: [userId, id], onDelete: NoAction)
+  counterparty       Counterparty?         @relation(fields: [userId, counterpartyId], references: [userId, id], onDelete: NoAction)
+  project            Project?              @relation(fields: [userId, projectId], references: [userId, id], onDelete: NoAction)
+  occurrences        RecurringOccurrence[]
+
+  @@unique([userId, id])
+  @@index([userId, status], map: "ix_recurring_transactions__status")
+  @@map("recurring_transactions")
+}
+
+/// Échéances matérialisées de transactions récurrentes selon DATA_MODEL.md §3.5 (M05).
+model RecurringOccurrence {
+  id                     String           @id @db.Uuid
+  userId                 String           @map("user_id") @db.Uuid
+  recurringTransactionId String           @map("recurring_transaction_id") @db.Uuid
+  dueOn                  DateTime         @map("due_on") @db.Date
+  expectedAmountMinor    BigInt           @map("expected_amount_minor")
+  currency               String           @db.Char(3)
+  status                 OccurrenceStatus @default(EXPECTED)
+  transactionId          String?          @map("transaction_id") @db.Uuid
+  confirmedAt            DateTime?        @map("confirmed_at") @db.Timestamptz(6)
+  skippedAt              DateTime?        @map("skipped_at") @db.Timestamptz(6)
+  createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: NoAction)
+  currencyRel          Currency             @relation(fields: [currency], references: [code], onDelete: NoAction)
+  recurringTransaction RecurringTransaction @relation(fields: [userId, recurringTransactionId], references: [userId, id], onDelete: Cascade)
+  transaction          Transaction?         @relation(fields: [userId, transactionId], references: [userId, id], onDelete: NoAction)
+
+  @@unique([userId, id])
+  @@unique([userId, recurringTransactionId, dueOn])
+  @@map("recurring_occurrences")
 }
