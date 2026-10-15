@@ -13,6 +13,7 @@ import {
   MONEY_STRICT,
   RAW_SQL,
   syntaxFor,
+  WEB_UI,
 } from './rules-orbit.mjs';
 
 const TS_FILES = ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'];
@@ -233,6 +234,16 @@ export function orbitEslint({ rootDir }) {
       rules: { 'react-hooks/rules-of-hooks': 'error', 'react-hooks/exhaustive-deps': 'error' },
     },
     { files: ['apps/web/src/**/*.tsx'], ...jsxA11y.flatConfigs.recommended },
+    {
+      files: ['apps/web/src/**/*.tsx'],
+      ignores: TEST_FILES,
+      rules: { 'no-restricted-syntax': syntaxFor(BASE, RAW_SQL, MONEY_LENIENT, WEB_UI) },
+    },
+    {
+      files: ['apps/web/src/features/finance/**/*.tsx', 'apps/web/src/features/pro/**/*.tsx'],
+      ignores: TEST_FILES,
+      rules: { 'no-restricted-syntax': syntaxFor(BASE, RAW_SQL, MONEY_STRICT, WEB_UI) },
+    },
     // Tests : tailles libres ; les matchers asymétriques de Vitest sont typés `any`.
     {
       files: TEST_FILES,
