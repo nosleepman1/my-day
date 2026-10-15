@@ -37,12 +37,12 @@ describe('finance contracts', () => {
     it('validates a correct account creation with default values', () => {
       const parsed = CreateAccountSchema.parse({
         name: 'Compte Principal',
-        type: 'CHECKING',
+        type: 'BANK',
         currency: 'XOF',
         openedOn: TODAY_CIVIL,
       });
       expect(parsed.name).toBe('Compte Principal');
-      expect(parsed.type).toBe('CHECKING');
+      expect(parsed.type).toBe('BANK');
       expect(parsed.currency).toBe('XOF');
       expect(parsed.openingBalanceMinor).toBe('0');
       expect(parsed.allowOverdraft).toBe(false);
@@ -51,7 +51,7 @@ describe('finance contracts', () => {
     it('rejects unknown or invalid currencies', () => {
       const result = CreateAccountSchema.safeParse({
         name: 'Compte EUR',
-        type: 'SAVINGS',
+        type: 'BANK',
         currency: 'XYZ',
         openedOn: TODAY_CIVIL,
       });
@@ -68,10 +68,9 @@ describe('finance contracts', () => {
 
     it('validates CloseAccountSchema', () => {
       const parsed = CloseAccountSchema.parse({
-        closedOn: TODAY_CIVIL,
         notes: 'Fermé définitivement',
       });
-      expect(parsed.closedOn).toBe(TODAY_CIVIL);
+      expect(parsed.notes).toBe('Fermé définitivement');
     });
 
     it('validates full AccountResponseSchema', () => {
@@ -79,13 +78,18 @@ describe('finance contracts', () => {
         id: UUID_1,
         name: 'Compte Cash',
         type: 'CASH',
+        provider: null,
         currency: 'XOF',
         currentBalanceMinor: '150000',
         openingBalanceMinor: '0',
         openedOn: TODAY_CIVIL,
-        closedOn: null,
         allowOverdraft: false,
+        overdraftLimitMinor: null,
+        includeInNetWorth: true,
+        color: null,
+        icon: null,
         notes: null,
+        archivedAt: null,
         createdAt: NOW_ISO,
         updatedAt: NOW_ISO,
       });
@@ -347,7 +351,7 @@ describe('finance contracts', () => {
           {
             accountId: UUID_1,
             name: 'Compte courant',
-            type: 'CHECKING',
+            type: 'BANK',
             currency: 'XOF',
             balanceMinor: '1500000',
             balanceInBaseMinor: '1500000',

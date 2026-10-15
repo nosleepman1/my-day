@@ -65,6 +65,7 @@ export const CreateTransactionSchema = z
     },
   );
 export type CreateTransaction = z.infer<typeof CreateTransactionSchema>;
+export type CreateTransactionInput = z.input<typeof CreateTransactionSchema>;
 
 export const UpdateTransactionDetailsSchema = z
   .object({
