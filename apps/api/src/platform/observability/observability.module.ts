@@ -6,9 +6,10 @@ import type { Env } from '../config/env.schema';
 import type { IdGeneratorPort } from '../ids/id-generator.port';
 import { IdsModule, ID_GENERATOR } from '../ids/ids.module';
 
+import { createErrorReporter, ERROR_REPORTER } from './error-reporter';
 import { buildLoggerParams } from './logger.options';
 
-/** Logs structurés pino (avec `requestId` et masquage) partagés par l'API et le worker. */
+/** Logs structurés pino (avec `requestId` et masquage) et suivi d'erreurs, partagés par l'API et le worker. */
 @Module({
   imports: [
     LoggerModule.forRootAsync({
@@ -17,6 +18,7 @@ import { buildLoggerParams } from './logger.options';
       useFactory: (env: Env, ids: IdGeneratorPort) => buildLoggerParams(env, ids),
     }),
   ],
-  exports: [LoggerModule],
+  providers: [{ provide: ERROR_REPORTER, inject: [APP_CONFIG], useFactory: createErrorReporter }],
+  exports: [LoggerModule, ERROR_REPORTER],
 })
 export class ObservabilityModule {}

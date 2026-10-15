@@ -1,0 +1,14 @@
+# Sauvegarde quotidienne de la production (INFRASTRUCTURE.md §11.4). Installée dans /etc/systemd/system.
+[Unit]
+Description=ORBIT encrypted backup (pg_dump + restic)
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# Copie figée installée par orbit-deploy après un déploiement de production réussi (jamais le HEAD du dépôt).
+ExecStart=/usr/local/lib/orbit/backup.sh --env production
+TimeoutStartSec=2h
+Nice=10
+IOSchedulingClass=idle
+# Pas de redémarrage automatique : un échec doit alerter (ping /fail Healthchecks.io), jamais être masqué.

@@ -15,6 +15,8 @@ async function bootstrap(): Promise<void> {
   const env = app.get<Env>(APP_CONFIG);
   configureHttp(app, env);
   await app.listen(env.PORT);
+  // Version déployée (SHA de l'image) : journalisée, jamais exposée par HTTP (PHASE-03 §5).
+  app.get(Logger).log({ appVersion: env.APP_VERSION, appEnv: env.APP_ENV }, 'api.started');
 }
 
 // Configuration invalide ou base indisponible au démarrage : message sans valeur, code de sortie non nul.

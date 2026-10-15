@@ -1,0 +1,113 @@
+# Staging sur le même VPS (INFRASTRUCTURE.md §2) : projet, base, volumes et secrets distincts ;
+# seul le réseau `orbit-edge` (Caddy) est partagé. Limites mémoire basses ; arrêtable hors usage.
+name: orbit-staging
+
+x-hardening: &hardening
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: '3' }
+
+x-api-image: &api-image ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/orbit-api:${ORBIT_SHA:?ORBIT_SHA is required}
+
+services:
+  api:
+    image: *api-image
+    <<: *hardening
+    env_file: ${ORBIT_ENV_DIR:-/etc/orbit/staging}/compose.env
+    environment:
+      NODE_ENV: production
+      APP_ENV: staging
+      PORT: '3000'
+      APP_VERSION: ${ORBIT_SHA}
+      NODE_OPTIONS: '--max-old-space-size=160'
+      DATABASE_URL_FILE: /run/secrets/database_url
+      RATE_LIMIT_HMAC_KEY_FILE: /run/secrets/rate_limit_hmac_key
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+    secrets: [database_url, rate_limit_hmac_key, smtp_password]
+    networks:
+      edge: { aliases: [orbit-staging-api] }
+      data: {}
+    depends_on:
+      postgres: { condition: service_healthy }
+    mem_limit: 200m
+
+  migrate:
+    image: *api-image
+    <<: *hardening
+    restart: 'no'
+    profiles: [tools]
+    environment:
+      NODE_ENV: production
+      HOME: /tmp
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - 'export DATABASE_MIGRATION_URL="$$(cat /run/secrets/database_migration_url)"; export DATABASE_URL="$$DATABASE_MIGRATION_URL"; exec node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma'
+    secrets: [database_migration_url]
+    networks: [data]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  postgres:
+    image: postgres:17.6-alpine
+    <<: *hardening
+    read_only: false
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    environment:
+      POSTGRES_USER: orbit_owner
+      POSTGRES_DB: orbit
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_owner_password
+      POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256'
+    command: ['postgres', '-c', 'shared_buffers=48MB', '-c', 'max_connections=20']
+    secrets: [postgres_owner_password, orbit_app_password, orbit_backup_password]
+    volumes:
+      - ${ORBIT_DATA_DIR:-/srv/orbit/staging}/pgdata:/var/lib/postgresql/data
+      - ./postgres/init-deployed:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U orbit_owner -d orbit']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [data]
+    mem_limit: 256m
+
+  backup:
+    image: postgres:17.6-alpine
+    <<: *hardening
+    restart: 'no'
+    profiles: [tools]
+    entrypoint: ['/bin/sh', '-c']
+    command: ['exec pg_dump --format=custom --no-owner "$$(cat /run/secrets/database_backup_url)"']
+    secrets: [database_backup_url]
+    networks: [data]
+    mem_limit: 256m
+
+networks:
+  # Jamais `orbit-edge` : le staging ne voit ni l'API de production, ni n8n, ni Uptime Kuma (revue C1).
+  edge:
+    name: orbit-edge-staging
+    external: true
+  data:
+    internal: true
+
+secrets:
+  database_url:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/staging/secrets}/database_url
+  database_migration_url:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/staging/secrets}/database_migration_url
+  database_backup_url:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/staging/secrets}/database_backup_url
+  rate_limit_hmac_key:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/staging/secrets}/rate_limit_hmac_key
+  smtp_password:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/staging/secrets}/smtp_password
+  postgres_owner_password:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/staging/secrets}/postgres_owner_password
+  orbit_app_password:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/staging/secrets}/orbit_app_password
+  orbit_backup_password:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/staging/secrets}/orbit_backup_password

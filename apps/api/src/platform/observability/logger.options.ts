@@ -1,11 +1,14 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import type { Params } from 'nestjs-pino';
+import type { DestinationStream } from 'pino';
 
 import type { Env } from '../config/env.schema';
 import type { IdGeneratorPort } from '../ids/id-generator.port';
 
 import { REDACT_CENSOR, REDACT_PATHS } from './redaction';
+
+type PinoHttpOptions = Exclude<NonNullable<Params['pinoHttp']>, DestinationStream | unknown[]>;
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const REQUEST_ID_FORMAT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -24,23 +27,23 @@ export function requestIdGenerator(ids: IdGeneratorPort) {
 }
 
 /** Options pino-http : JSON structuré, `requestId`, masquage central, aucun corps journalisé (CODING_STANDARDS §7). */
-export function buildLoggerParams(env: Env, ids: IdGeneratorPort): Params {
-  return {
-    pinoHttp: {
-      level: env.LOG_LEVEL,
-      genReqId: requestIdGenerator(ids),
-      redact: { paths: [...REDACT_PATHS], censor: REDACT_CENSOR },
-      serializers: {
-        req: (request: { id: unknown; method: unknown; url: unknown }) => ({
-          id: request.id,
-          method: request.method,
-          url: request.url,
-        }),
-        res: (response: { statusCode: unknown }) => ({ statusCode: response.statusCode }),
-      },
-      ...(env.APP_ENV === 'local'
-        ? { transport: { target: 'pino-pretty', options: { singleLine: true } } }
-        : {}),
+/** `destination` : flux de test uniquement (caviardage vérifié de bout en bout) ; absent en production. */
+export function buildLoggerParams(env: Env, ids: IdGeneratorPort, destination?: DestinationStream): Params {
+  const options: PinoHttpOptions = {
+    level: env.LOG_LEVEL,
+    genReqId: requestIdGenerator(ids),
+    redact: { paths: [...REDACT_PATHS], censor: REDACT_CENSOR },
+    serializers: {
+      req: (request: { id: unknown; method: unknown; url: unknown }) => ({
+        id: request.id,
+        method: request.method,
+        url: request.url,
+      }),
+      res: (response: { statusCode: unknown }) => ({ statusCode: response.statusCode }),
     },
+    ...(env.APP_ENV === 'local'
+      ? { transport: { target: 'pino-pretty', options: { singleLine: true } } }
+      : {}),
   };
+  return { pinoHttp: destination === undefined ? options : [options, destination] };
 }

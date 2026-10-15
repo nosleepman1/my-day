@@ -338,6 +338,30 @@ Si l'ouverture publique (ADR-026) intervient avant PHASE-17 :
   - `@swc/cli`, `@swc/core` et `unplugin-swc` sortent des dépendances de l'API. `@swc/core` reste présent comme dépendance optionnelle d'outils tiers, sans être chargé.
 - **Conséquences :** le compilateur TypeScript est du JavaScript pur, que le contrôle d'application ne peut pas bloquer. Le build est un peu plus lent (quelques secondes) ; la vérification de types reste `pnpm typecheck`. Aucun changement pour le code applicatif.
 
+### ADR-041 : PostgreSQL sur le VPS au démarrage (tranche OD-7)
+
+- **Statut :** proposée en PHASE-03, **à valider par le propriétaire** (décision de coût).
+- **Contexte :** OD-7 oppose PostgreSQL en conteneur sur le VPS OVH et Neon managé (région UE). ORBIT démarre avec un seul utilisateur réel ; le budget mémoire (INFRASTRUCTURE.md §10.1) donne ≈ 2,0 Go en production avec PostgreSQL, sur un VPS de 4 Go doté de 2 Go de swap.
+- **Décision :** PostgreSQL 17 en conteneur sur le VPS (`infra/compose/compose.production.yml`), réseau `data` interne, rôles `orbit_owner` / `orbit_app` / `orbit_backup`, sauvegarde `pg_dump` quotidienne et avant chaque migration, chiffrée par restic vers un fournisseur distinct. **Un VPS de 8 Go est recommandé** si l'écart de prix est faible, pour garder le staging démarré en permanence.
+- **Alternatives :** Neon (restauration à un instant donné, VPS soulagé de ~600 Mo) : écarté au démarrage pour éviter une quatrième dépendance SaaS, la latence inter-fournisseurs et le coût dès que l'offre gratuite ne suffit plus. Il redevient le choix par défaut si le RPO doit descendre sous 24 h ou si la base dépasse ~20 Go.
+- **Conséquences :** la restauration est testable sur n'importe quel PostgreSQL 17 (`infra/scripts/restore.sh`, répétée en local en PHASE-03). Passer à Neon plus tard se fait par `pg_dump`/`pg_restore` sans changement de code (seules les URL de connexion changent).
+
+### ADR-042 : e-mail transactionnel par relais SMTP chiffré (Brevo par défaut)
+
+- **Statut :** acceptée en PHASE-03.
+- **Contexte :** l'API envoie déjà ses e-mails par un adaptateur SMTP unique, testé contre Mailpit. La revue de sécurité de PHASE-01 (M8) exige un transport chiffré en déploiement.
+- **Décision :** un seul adaptateur SMTP (`MAIL_DRIVER=smtp`) ; en staging et en production, `SMTP_SECURITY=starttls` (587, TLS 1.2 minimum, montée en TLS obligatoire) ou `tls` (465), identifiants obligatoires (`SMTP_USER`, `SMTP_PASSWORD_FILE`). Fournisseur par défaut : **Brevo** (entreprise française, données en UE, 300 e-mails par jour gratuits, relais SMTP standard). **Resend** reste possible par son relais SMTP, sans changement de code. Le staging n'envoie qu'aux destinataires de `MAIL_ALLOWLIST` (adresses ou `@domaine`).
+- **Alternatives :** adaptateurs HTTP propres à chaque fournisseur : écartés, ils doubleraient le code et les tests pour un gain nul à ce volume.
+- **Conséquences :** l'API refuse de démarrer en déploiement avec un SMTP en clair ou sans identifiants. SPF, DKIM et DMARC sont configurés par le propriétaire dans son DNS (runbook `first-setup`).
+
+### ADR-043 : destination de la réécriture `/api` choisie par hôte dans `vercel.json`
+
+- **Statut :** acceptée en PHASE-03 (lève le point « à vérifier » d'INFRASTRUCTURE.md §4.3).
+- **Contexte :** un `vercel.json` statique ne lit pas les variables d'environnement ; or les préversions ne doivent jamais viser l'API de production.
+- **Décision :** deux réécritures `/api/:path*` ordonnées : la première, conditionnée par `has: [{ type: "host", value: "orbit.<domaine>" }]`, vise l'API de production ; la seconde, sans condition, vise l'API de staging. Tout autre hôte (domaine de staging, préversions `*.vercel.app`) part donc vers le staging.
+- **Alternatives :** `vercel.ts` ou un middleware de routage : plus souples, mais ajoutent du code exécuté à chaque requête pour un besoin satisfait par la configuration.
+- **Conséquences :** le domaine de production est écrit en dur dans `vercel.json` (valeur fictive `orbit.example.com` à remplacer au branchement du domaine réel, runbook `first-setup`). Une CI vérifie que la réécriture de production reste liée à un hôte.
+
 ---
 
 ## Décisions ouvertes (à trancher au plus tard au démarrage de la phase indiquée)
@@ -350,7 +374,7 @@ Si l'ouverture publique (ADR-026) intervient avant PHASE-17 :
 | OD-4 | Avoirs, radiation et utilisation du crédit client | PHASE-10 |
 | OD-5 | Fournisseur de transcription vocale (l'API Claude ne transcrit pas l'audio) | PHASE-16 |
 | OD-6 | Intérêts et pénalités sur les dettes ; conversion vers une devise de reporting | Après PHASE-06 |
-| OD-7 | Base de données : PostgreSQL sur le VPS ou Neon managé (sauvegardes et restauration à un instant donné incluses, VPS soulagé ; recommandé pour les données financières, en région UE) | PHASE-03 |
+| OD-7 | Base de données : PostgreSQL sur le VPS ou Neon managé. **Proposition : ADR-041 (PostgreSQL sur le VPS), à valider par le propriétaire.** | PHASE-03 |
 
 ---
 
