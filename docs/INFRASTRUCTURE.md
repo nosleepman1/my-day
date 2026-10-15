@@ -433,6 +433,9 @@ Légende : **O** = obligatoire, **C** = conditionnel, **F** = facultatif. **S** 
 | `AUTH_UNIFORM_RESPONSE_MS` | Durée plancher (ms) des réponses d'inscription et de renvoi, pour ne pas révéler l'existence d'un compte ; > 0 en déploiement | `750` | F (`750`) | 01 |
 | `SESSION_IDLE_DAYS` / `SESSION_ABSOLUTE_DAYS` | Expirations de session | `7` / `30` | F | 01 |
 | `RATE_LIMIT_STORE` | `memory` puis `redis` | `memory` | F | 01 |
+| `RATE_LIMIT_HMAC_KEY` **S** | Clé HMAC-SHA256 des compteurs anti-abus et de `login_events.email_hmac` (32 caractères min.) | `fake-rate-limit-key-…` | O | 01 |
+| `RATE_LIMIT_ENABLED` | Limitation de débit ; `false` admis dans les tests uniquement (refusé en déploiement) | `true` | F (`true`) | 01 |
+| `LOGIN_DELAY_UNIT_MS` | Délai progressif par échec de connexion récent (max 2 s) ; > 0 en déploiement | `250` | F (`250`) | 01 |
 | `SENTRY_DSN` | DSN du projet Sentry SaaS « api » (région UE) ; non secret, mais propre à chaque environnement | `https://key@o0.ingest.de.sentry.io/1` | C (staging, prod) | 03 |
 | `SENTRY_ENVIRONMENT` | Environnement Sentry | `production` | F (`APP_ENV`) | 03 |
 | `METRICS_PORT` | Port interne Prometheus | `9464` | F | 03 |

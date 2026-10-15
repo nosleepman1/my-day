@@ -4,7 +4,7 @@ SaaS d'organisation personnelle : finances (espèces, mobile money, banque), id�
 
 ## État
 
-Développement en 18 phases (voir [docs/ROADMAP.md](docs/ROADMAP.md)). Le socle technique (PHASE-00) est en place : monorepo, API NestJS, front React, contrats partagés, calculs monétaires, tests et CI.
+Développement en 18 phases (voir [docs/ROADMAP.md](docs/ROADMAP.md)). Le socle technique (PHASE-00) et l'identité (PHASE-01 : comptes, sessions, isolation, audit) sont en place ; le shell web (PHASE-02 : design system, navigation, pages d'authentification et de paramètres) est en cours. Le dernier rapport est dans [docs/progress/](docs/progress/).
 
 ## Stack
 
@@ -41,7 +41,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-- Front : http://localhost:5173 (la page affiche « API OK » quand toute la chaîne fonctionne)
+- Front : http://localhost:5173 (connexion et inscription) ; http://localhost:5173/status affiche « API OK » quand toute la chaîne fonctionne
 - API : http://localhost:3000/api/v1/health/live
 - Mailpit : http://localhost:8025
 - PostgreSQL de développement : port **5433** sur la machine, pour ne pas entrer en conflit avec un PostgreSQL déjà installé.
@@ -60,6 +60,20 @@ pnpm dev
 | `pnpm infra:down` / `pnpm infra:reset` | Arrêter, ou réinitialiser la base locale |
 | `pnpm build` | Build des paquets, de l'API (`tsc`) et du front (Vite) |
 | `pnpm ci:local` | Rejoue toute la CI en local (audit, lint, types, tests, build, E2E isolé sur une base Docker dédiée) |
+
+## Compte administrateur
+
+L'inscription dépend de `REGISTRATION_MODE` (`closed`, `allowlist`, `open`, ADR-026). Le rôle ADMIN ne s'obtient jamais par l'interface : après avoir créé et vérifié le compte, compilez l'API puis lancez :
+
+```bash
+pnpm --filter @orbit/api build
+```
+
+```bash
+pnpm --filter @orbit/api cli create-admin --email vous@exemple.sn
+```
+
+Un seul ADMIN existe ; `--force` transfère le rôle à une autre adresse. L'opération est auditée.
 
 ## Documentation
 
