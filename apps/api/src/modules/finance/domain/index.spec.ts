@@ -14,5 +14,7 @@ describe('finance domain index', () => {
     expect(financeDomain.buildTransferLedgerEntries).toBeDefined();
     expect(financeDomain.assertCanCancelTransaction).toBeDefined();
     expect(financeDomain.assertCancellationDoesNotViolateOverdraft).toBeDefined();
+    expect(financeDomain.assertValidAdjustment).toBeDefined();
+    expect(financeDomain.calculateReconciliation).toBeDefined();
   });
 });

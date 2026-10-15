@@ -128,4 +128,54 @@ export class AccountsRepository {
 
     return calculateBalance(account.openingBalanceMinor, items);
   }
+
+  async getClearedBalance(
+    userId: string,
+    accountId: string,
+    statementDate: Date,
+  ): Promise<{ clearedBalanceMinor: bigint; unreconciledCount: number } | null> {
+    const account = await this.ctx.db.financialAccount.findFirst({
+      where: { userId, id: accountId },
+      select: { openingBalanceMinor: true },
+    });
+
+    if (!account) {
+      return null;
+    }
+
+    const entries = await this.ctx.db.ledgerEntry.findMany({
+      where: { userId, accountId },
+      select: {
+        direction: true,
+        amountMinor: true,
+        transaction: {
+          select: {
+            status: true,
+            valueDate: true,
+          },
+        },
+      },
+    });
+
+    let clearedBalance = account.openingBalanceMinor;
+    let unreconciledCount = 0;
+
+    for (const entry of entries) {
+      const tx = entry.transaction;
+      if (tx.status === 'CANCELLED') {
+        continue;
+      }
+      if (tx.status === 'VALIDATED' && tx.valueDate <= statementDate) {
+        if (entry.direction === 'CREDIT') {
+          clearedBalance += entry.amountMinor;
+        } else {
+          clearedBalance -= entry.amountMinor;
+        }
+      } else {
+        unreconciledCount++;
+      }
+    }
+
+    return { clearedBalanceMinor: clearedBalance, unreconciledCount };
+  }
 }

@@ -154,4 +154,49 @@ describe('AccountsRepository', () => {
     const balance = await repo.getBalance(USER_1, 'non-existent');
     expect(balance).toBeNull();
   });
+
+  it('calculates cleared balance and unreconciled count as of statement date', async () => {
+    mockPrisma.financialAccount.findFirst.mockResolvedValueOnce({
+      openingBalanceMinor: 50_000n,
+    });
+    mockPrisma.ledgerEntry.findMany.mockResolvedValueOnce([
+      {
+        direction: 'CREDIT',
+        amountMinor: 25_000n,
+        transaction: { status: 'VALIDATED', valueDate: new Date('2026-10-10') },
+      },
+      {
+        direction: 'DEBIT',
+        amountMinor: 10_000n,
+        transaction: { status: 'VALIDATED', valueDate: new Date('2026-10-14') },
+      },
+      {
+        direction: 'CREDIT',
+        amountMinor: 15_000n,
+        transaction: { status: 'VALIDATED', valueDate: new Date('2026-10-20') },
+      },
+      {
+        direction: 'DEBIT',
+        amountMinor: 5_000n,
+        transaction: { status: 'PENDING', valueDate: new Date('2026-10-12') },
+      },
+      {
+        direction: 'DEBIT',
+        amountMinor: 8_000n,
+        transaction: { status: 'CANCELLED', valueDate: new Date('2026-10-10') },
+      },
+    ]);
+
+    const res = await repo.getClearedBalance(USER_1, ACCOUNT_1, new Date('2026-10-15'));
+    expect(res).toEqual({
+      clearedBalanceMinor: 65_000n, // 50_000 + 25_000 - 10_000
+      unreconciledCount: 2, // 1 future validated + 1 pending
+    });
+  });
+
+  it('returns null if account is not found in getClearedBalance', async () => {
+    mockPrisma.financialAccount.findFirst.mockResolvedValueOnce(null);
+    const res = await repo.getClearedBalance(USER_1, 'non-existent', new Date('2026-10-15'));
+    expect(res).toBeNull();
+  });
 });

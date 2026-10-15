@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
-import { CurrencyCodeSchema, MoneyStringSchema } from '../common/amount';
+import { CurrencyCodeSchema, MoneyStringSchema, PositiveMoneyStringSchema } from '../common/amount';
 import { CivilDateSchema, InstantSchema } from '../common/dates';
 import { dataEnvelope } from '../common/envelope';
 import { HexColorSchema, optionalText, text } from '../organization/common';
+
+import { EntryDirectionSchema } from './transactions.schema';
 
 export const ACCOUNT_TYPES = ['CASH', 'MOBILE_MONEY', 'BANK', 'PAYMENT_ACCOUNT', 'OTHER'] as const;
 export const AccountTypeSchema = z.enum(ACCOUNT_TYPES);
@@ -91,3 +93,15 @@ export type AccountEnvelope = z.infer<typeof AccountEnvelopeSchema>;
 
 export const AccountListEnvelopeSchema = z.object({ data: z.array(AccountResponseSchema) });
 export type AccountListEnvelope = z.infer<typeof AccountListEnvelopeSchema>;
+
+export const AccountAdjustmentSchema = z
+  .object({
+    amountMinor: PositiveMoneyStringSchema,
+    direction: EntryDirectionSchema,
+    reason: text(1, 500),
+    valueDate: CivilDateSchema.optional(),
+    occurredAt: InstantSchema.optional(),
+  })
+  .strict();
+export type AccountAdjustment = z.infer<typeof AccountAdjustmentSchema>;
+export type AccountAdjustmentInput = z.input<typeof AccountAdjustmentSchema>;

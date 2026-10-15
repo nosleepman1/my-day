@@ -1,25 +1,42 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ZodSerializerDto } from 'nestjs-zod';
 
-import type { AccountEnvelope, AccountListEnvelope } from '@orbit/contracts';
+import type {
+  AccountEnvelope,
+  AccountListEnvelope,
+  ReconciliationResultEnvelope,
+  ReconciliationStatusEnvelope,
+  TransactionEnvelope,
+} from '@orbit/contracts';
 
+import { Idempotent } from '../../../platform/idempotency/idempotent.decorator';
 import {
+  AccountAdjustmentDto,
   AccountEnvelopeDto,
   AccountListEnvelopeDto,
   CloseAccountDto,
+  ConfirmReconciliationDto,
   CreateAccountDto,
   IdParamDto,
   ListAccountsQueryDto,
+  ReconciliationQueryDto,
+  ReconciliationResultEnvelopeDto,
+  ReconciliationStatusEnvelopeDto,
   ReopenAccountDto,
+  TransactionEnvelopeDto,
   UpdateAccountDto,
 } from '../finance.dto';
+import { ReconciliationService } from '../reconciliation/reconciliation.service';
 
 import { AccountsService } from './accounts.service';
 
 /** Comptes financiers (API.md §14.6, FINANCE_RULES.md §1). */
 @Controller('finance/accounts')
 export class AccountsController {
-  constructor(private readonly accounts: AccountsService) {}
+  constructor(
+    private readonly accounts: AccountsService,
+    private readonly reconciliation: ReconciliationService,
+  ) {}
 
   @Post()
   @ZodSerializerDto(AccountEnvelopeDto)
@@ -62,6 +79,38 @@ export class AccountsController {
   @ZodSerializerDto(AccountEnvelopeDto)
   async reopen(@Param() params: IdParamDto, @Body() body: ReopenAccountDto): Promise<AccountEnvelope> {
     const data = await this.accounts.reopen(params.id, body);
+    return { data };
+  }
+
+  @Post(':id/adjustments')
+  @Idempotent()
+  @ZodSerializerDto(TransactionEnvelopeDto)
+  async adjustAccount(
+    @Param() params: IdParamDto,
+    @Body() body: AccountAdjustmentDto,
+  ): Promise<TransactionEnvelope> {
+    const data = await this.reconciliation.adjust(params.id, body);
+    return { data };
+  }
+
+  @Get(':id/reconciliations')
+  @ZodSerializerDto(ReconciliationStatusEnvelopeDto)
+  async previewReconciliation(
+    @Param() params: IdParamDto,
+    @Query() query: ReconciliationQueryDto,
+  ): Promise<ReconciliationStatusEnvelope> {
+    const data = await this.reconciliation.previewReconciliation(params.id, query);
+    return { data };
+  }
+
+  @Post(':id/reconciliations')
+  @Idempotent()
+  @ZodSerializerDto(ReconciliationResultEnvelopeDto)
+  async confirmReconciliation(
+    @Param() params: IdParamDto,
+    @Body() body: ConfirmReconciliationDto,
+  ): Promise<ReconciliationResultEnvelope> {
+    const data = await this.reconciliation.confirmReconciliation(params.id, body);
     return { data };
   }
 }

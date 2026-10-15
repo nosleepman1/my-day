@@ -5,6 +5,7 @@ import {
   UpdateAccountSchema,
   CloseAccountSchema,
   AccountResponseSchema,
+  AccountAdjustmentSchema,
 } from './accounts.schema';
 import { CreateCategorySchema, UpdateCategorySchema, CategoryResponseSchema } from './categories.schema';
 import {
@@ -12,7 +13,12 @@ import {
   UpdateCounterpartySchema,
   MergeCounterpartySchema,
 } from './counterparties.schema';
-import { StartReconciliationSchema, ReconcileTransactionsSchema } from './reconciliation.schema';
+import {
+  StartReconciliationSchema,
+  ReconcileTransactionsSchema,
+  ConfirmReconciliationSchema,
+  ReconciliationResultSchema,
+} from './reconciliation.schema';
 import {
   CashFlowQuerySchema,
   CashFlowReportSchema,
@@ -399,6 +405,65 @@ describe('finance contracts', () => {
       });
       expect(parsed.transactionIds).toHaveLength(2);
       expect(parsed.createAdjustmentIfNeeded).toBe(false);
+    });
+
+    it('validates ConfirmReconciliationSchema', () => {
+      const parsed = ConfirmReconciliationSchema.parse({
+        statementDate: TODAY_CIVIL,
+        statementEndingBalanceMinor: '100000',
+        createAdjustmentIfNeeded: true,
+        adjustmentReason: 'Écart de relevé bancaire',
+      });
+      expect(parsed.createAdjustmentIfNeeded).toBe(true);
+      expect(parsed.adjustmentReason).toBe('Écart de relevé bancaire');
+    });
+
+    it('validates ReconciliationResultSchema', () => {
+      const parsed = ReconciliationResultSchema.parse({
+        accountId: UUID_1,
+        statementDate: TODAY_CIVIL,
+        statementEndingBalanceMinor: '100000',
+        clearedBalanceMinor: '100000',
+        differenceMinor: '0',
+        isBalanced: true,
+        adjustmentTransaction: null,
+      });
+      expect(parsed.isBalanced).toBe(true);
+      expect(parsed.differenceMinor).toBe('0');
+    });
+  });
+
+  describe('account adjustment schema', () => {
+    it('validates AccountAdjustmentSchema with credit direction', () => {
+      const parsed = AccountAdjustmentSchema.parse({
+        amountMinor: '5000',
+        direction: 'CREDIT',
+        reason: 'Solde initial corrigé',
+        valueDate: TODAY_CIVIL,
+      });
+      expect(parsed.amountMinor).toBe('5000');
+      expect(parsed.direction).toBe('CREDIT');
+      expect(parsed.reason).toBe('Solde initial corrigé');
+    });
+
+    it('rejects zero or negative adjustment amount', () => {
+      expect(() =>
+        AccountAdjustmentSchema.parse({
+          amountMinor: '0',
+          direction: 'DEBIT',
+          reason: 'Ajustement nul',
+        }),
+      ).toThrow();
+    });
+
+    it('rejects empty reason', () => {
+      expect(() =>
+        AccountAdjustmentSchema.parse({
+          amountMinor: '1000',
+          direction: 'CREDIT',
+          reason: '   ',
+        }),
+      ).toThrow();
     });
   });
 });

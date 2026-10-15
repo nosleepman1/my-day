@@ -268,6 +268,33 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       'post',
       (f) => `/finance/accounts/${f.account}/reopen`,
     ),
+    'POST /api/v1/finance/accounts/:id/adjustments': atFinance(
+      'post',
+      (f) => `/finance/accounts/${f.account}/adjustments`,
+      {
+        body: () => ({
+          amountMinor: '1000',
+          direction: 'CREDIT',
+          reason: 'Ajustement intrus',
+        }),
+      },
+    ),
+    'GET /api/v1/finance/accounts/:id/reconciliations': atFinance(
+      'get',
+      (f) =>
+        `/finance/accounts/${f.account}/reconciliations?statementDate=2026-10-15&statementEndingBalanceMinor=100000`,
+    ),
+    'POST /api/v1/finance/accounts/:id/reconciliations': atFinance(
+      'post',
+      (f) => `/finance/accounts/${f.account}/reconciliations`,
+      {
+        body: () => ({
+          statementDate: '2026-10-15',
+          statementEndingBalanceMinor: '100000',
+          createAdjustmentIfNeeded: false,
+        }),
+      },
+    ),
     'GET /api/v1/finance/categories/:id': atFinance('get', (f) => `/finance/categories/${f.category}`),
     'PATCH /api/v1/finance/categories/:id': atFinance('patch', (f) => `/finance/categories/${f.category}`, {
       body: () => ({ name: 'Nouveau nom catégorie' }),

@@ -35,6 +35,7 @@ export const AUDIT_ACTIONS = [
   'finance.transaction.delete',
   'finance.adjustment.create',
   'finance.transfer.create',
+  'finance.reconciliation.confirm',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

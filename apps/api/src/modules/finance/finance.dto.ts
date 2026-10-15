@@ -1,11 +1,13 @@
 import { createZodDto } from 'nestjs-zod';
 
 import {
+  AccountAdjustmentSchema,
   AccountEnvelopeSchema,
   AccountListEnvelopeSchema,
   CategoryEnvelopeSchema,
   CategoryListEnvelopeSchema,
   CloseAccountSchema,
+  ConfirmReconciliationSchema,
   CounterpartyEnvelopeSchema,
   CounterpartyListEnvelopeSchema,
   CreateAccountSchema,
@@ -20,6 +22,9 @@ import {
   ListCounterpartiesQuerySchema,
   ListTransactionsQuerySchema,
   MergeCounterpartySchema,
+  ReconciliationQuerySchema,
+  ReconciliationResultEnvelopeSchema,
+  ReconciliationStatusEnvelopeSchema,
   ReopenAccountSchema,
   TransactionEnvelopeSchema,
   TransactionListEnvelopeSchema,
@@ -66,3 +71,9 @@ export class TransactionListEnvelopeDto extends createZodDto(TransactionListEnve
 
 export class CreateTransferDto extends createZodDto(CreateTransferSchema) {}
 export class TransferEnvelopeDto extends createZodDto(TransferEnvelopeSchema) {}
+
+export class AccountAdjustmentDto extends createZodDto(AccountAdjustmentSchema) {}
+export class ReconciliationQueryDto extends createZodDto(ReconciliationQuerySchema) {}
+export class ConfirmReconciliationDto extends createZodDto(ConfirmReconciliationSchema) {}
+export class ReconciliationStatusEnvelopeDto extends createZodDto(ReconciliationStatusEnvelopeSchema) {}
+export class ReconciliationResultEnvelopeDto extends createZodDto(ReconciliationResultEnvelopeSchema) {}
