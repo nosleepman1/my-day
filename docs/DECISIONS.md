@@ -362,13 +362,22 @@ Si l'ouverture publique (ADR-026) intervient avant PHASE-17 :
 - **Alternatives :** `vercel.ts` ou un middleware de routage : plus souples, mais ajoutent du code exécuté à chaque requête pour un besoin satisfait par la configuration.
 - **Conséquences :** le domaine de production est écrit en dur dans `vercel.json` (valeur fictive `orbit.example.com` à remplacer au branchement du domaine réel, runbook `first-setup`). Une CI vérifie que la réécriture de production reste liée à un hôte.
 
+### ADR-044 : Modélisation de la tontine par catégories standards (tranche OD-1)
+
+- **Statut :** acceptée en PHASE-05.
+- **Date :** 15 octobre 2026.
+- **Contexte :** OD-1 interrogeait la modélisation de la tontine (compte dédié, dette/créance ou simple catégorie).
+- **Décision :** la tontine ne dispose d'aucun modèle relationnel ni type de compte dédié. Elle est modélisée par des catégories d'opérations standards (`income.tontine_payout` pour la main reçue et `expense.tontine` pour la cotisation), associables à des contreparties (nom du groupe ou organisateur).
+- **Raison :** méthode la plus souple et universelle, sans alourdir le schéma relationnel de la finance.
+- **Conséquences :** aucune table supplémentaire. Le seed sénégalais intègre ces catégories prêtes à l'emploi.
+
 ---
 
 ## Décisions ouvertes (à trancher au plus tard au démarrage de la phase indiquée)
 
 | # | Sujet | Phase |
 |---|---|---|
-| OD-1 | Tontine : faut-il la modéliser comme un compte, une dette/créance ou une catégorie ? | PHASE-05 |
+| OD-1 | Tontine : traitée par catégories standards (**Tranchée par ADR-044**) | PHASE-05 |
 | OD-2 | Ajustements du principal d'une dette : quelle table, ou une transaction `ADJUSTMENT` liée ? (FINANCE_RULES OD-F5) | PHASE-06 |
 | OD-3 | Import de données (§4.25) : quel module, quelle phase ? Proposition : PHASE-07, en import CSV de transactions avec prévisualisation. | PHASE-07 |
 | OD-4 | Avoirs, radiation et utilisation du crédit client | PHASE-10 |

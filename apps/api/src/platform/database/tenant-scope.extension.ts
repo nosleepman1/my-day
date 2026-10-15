@@ -12,6 +12,7 @@ export const UNSCOPED_MODELS: ReadonlySet<string> = new Set([
   'Session',
   'EmailVerificationToken',
   'PasswordResetToken',
+  'Currency',
 ]);
 
 /** Requête qui contournerait le cloisonnement : erreur de programmation, jamais exécutée. */

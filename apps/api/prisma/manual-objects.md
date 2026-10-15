@@ -85,5 +85,39 @@ Objets que Prisma ne sait pas exprimer, écrits à la main dans les migrations (
 | `ix_tasks__idea` | index partiel (FK `idea_id`) | tasks | 20261014000100_phase04_review_fixes |
 | `ix_tasks__project_fk` | index partiel (FK `project_id`) | tasks | 20261014000100_phase04_review_fixes |
 | `orbit_task_dependencies_no_cycle()` : `search_path` figé | fonction | — | 20261014000100_phase04_review_fixes |
+| `ck_currencies__code` | CHECK | currencies | 20261015000000_phase05_finance_core |
+| `ck_currencies__exponent` | CHECK | currencies | 20261015000000_phase05_finance_core |
+| `ck_financial_accounts__opening` | CHECK | financial_accounts | 20261015000000_phase05_finance_core |
+| `ck_financial_accounts__overdraft` | CHECK | financial_accounts | 20261015000000_phase05_finance_core |
+| `ux_financial_accounts__name` | index unique partiel | financial_accounts | 20261015000000_phase05_finance_core |
+| `orbit_financial_accounts_guard()` | fonction | — | 20261015000000_phase05_finance_core |
+| `trg_financial_accounts__guard` | déclencheur (immutabilité devise et solde initial) | financial_accounts | 20261015000000_phase05_finance_core |
+| `ck_transaction_categories__system` | CHECK | transaction_categories | 20261015000000_phase05_finance_core |
+| `ck_transaction_categories__not_own_parent` | CHECK | transaction_categories | 20261015000000_phase05_finance_core |
+| `ck_transaction_categories__class` | CHECK | transaction_categories | 20261015000000_phase05_finance_core |
+| `ux_transaction_categories__name` | index unique NULLS NOT DISTINCT | transaction_categories | 20261015000000_phase05_finance_core |
+| `ix_counterparties__name_trgm` | index GIN trigramme | counterparties | 20261015000000_phase05_finance_core |
+| `ck_transactions__amount_positive` | CHECK | transactions | 20261015000000_phase05_finance_core |
+| `ck_transactions__validated` | CHECK | transactions | 20261015000000_phase05_finance_core |
+| `ck_transactions__cancelled` | CHECK | transactions | 20261015000000_phase05_finance_core |
+| `ck_transactions__fee` | CHECK | transactions | 20261015000000_phase05_finance_core |
+| `ck_transactions__refund` | CHECK | transactions | 20261015000000_phase05_finance_core |
+| `ck_transactions__rate` | CHECK | transactions | 20261015000000_phase05_finance_core |
+| `ck_transactions__economic_class` | CHECK | transactions | 20261015000000_phase05_finance_core |
+| `ux_transactions__idempotency` | index unique partiel | transactions | 20261015000000_phase05_finance_core |
+| `ix_transactions__description_trgm` | index GIN trigramme | transactions | 20261015000000_phase05_finance_core |
+| `orbit_transactions_guard()` | fonction | — | 20261015000000_phase05_finance_core |
+| `trg_transactions__guard` | déclencheur (garde transitions et fige champs clés) | transactions | 20261015000000_phase05_finance_core |
+| `ck_ledger_entries__amount_positive` | CHECK | ledger_entries | 20261015000000_phase05_finance_core |
+| `orbit_ledger_entries_guard()` | fonction | — | 20261015000000_phase05_finance_core |
+| `trg_ledger_entries__guard` | déclencheur (append-only et insertion PENDING seule) | ledger_entries | 20261015000000_phase05_finance_core |
+| `orbit_transactions_entries_shape()` | fonction | — | 20261015000000_phase05_finance_core |
+| `trg_transactions__entries_shape` | déclencheur de contrainte déferrable | transactions | 20261015000000_phase05_finance_core |
+| `trg_ledger_entries__entries_shape` | déclencheur de contrainte déferrable | ledger_entries | 20261015000000_phase05_finance_core |
+| `ck_idempotency_keys__completed` | CHECK | idempotency_keys | 20261015000000_phase05_finance_core |
+| `ck_projects__budget` | CHECK | projects | 20261015000000_phase05_finance_core |
+| `ux_note_links__transaction` | index unique partiel | note_links | 20261015000000_phase05_finance_core |
+| `ux_note_links__counterparty` | index unique partiel | note_links | 20261015000000_phase05_finance_core |
+| `orbit_forbid_log_mutation()` : `search_path` figé | fonction | — | 20261015000000_phase05_finance_core |
 
 `prisma migrate diff` signale toujours deux écarts attendus : les index BRIN (Prisma ne les modélise pas avec un nom fixe) et les trois FK `SET NULL (colonne)` (Prisma ne connaît que `SET NULL` sur toutes les colonnes, ce qui effacerait `user_id`). Toute migration générée doit être relue pour retirer les `DROP INDEX …_brin` et la réécriture de ces FK.

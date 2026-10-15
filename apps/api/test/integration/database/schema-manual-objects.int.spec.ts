@@ -43,6 +43,24 @@ const CONSTRAINTS = [
   'ck_notes__content_len',
   'ck_notes__version',
   'ck_note_links__one_target',
+  // PHASE-05 (M04)
+  'ck_currencies__code',
+  'ck_currencies__exponent',
+  'ck_financial_accounts__opening',
+  'ck_financial_accounts__overdraft',
+  'ck_transaction_categories__system',
+  'ck_transaction_categories__not_own_parent',
+  'ck_transaction_categories__class',
+  'ck_transactions__amount_positive',
+  'ck_transactions__validated',
+  'ck_transactions__cancelled',
+  'ck_transactions__fee',
+  'ck_transactions__refund',
+  'ck_transactions__rate',
+  'ck_transactions__economic_class',
+  'ck_ledger_entries__amount_positive',
+  'ck_idempotency_keys__completed',
+  'ck_projects__budget',
 ];
 const INDEXES = [
   'ux_users__single_admin',
@@ -74,6 +92,14 @@ const INDEXES = [
   'ux_note_links__idea',
   'ux_note_links__project',
   'ux_note_links__task',
+  // PHASE-05 (M04)
+  'ux_financial_accounts__name',
+  'ux_transaction_categories__name',
+  'ix_counterparties__name_trgm',
+  'ux_transactions__idempotency',
+  'ix_transactions__description_trgm',
+  'ux_note_links__transaction',
+  'ux_note_links__counterparty',
 ];
 const TRIGGERS = [
   'trg_task_dependencies__no_cycle',
@@ -81,6 +107,12 @@ const TRIGGERS = [
   'trg_login_events__no_truncate',
   'trg_audit_logs__append_only',
   'trg_audit_logs__no_truncate',
+  // PHASE-05 (M04)
+  'trg_financial_accounts__guard',
+  'trg_transactions__guard',
+  'trg_ledger_entries__guard',
+  'trg_transactions__entries_shape',
+  'trg_ledger_entries__entries_shape',
 ];
 
 const AUDIT_ID = '0192f1c3-7a2b-7c1e-9d0f-3b4c5d6e7f81';

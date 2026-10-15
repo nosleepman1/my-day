@@ -133,6 +133,13 @@ model User {
   noteTags                NoteTag[]
   notes                   Note[]
   noteLinks               NoteLink[]
+  financialAccounts       FinancialAccount[]
+  transactionCategories   TransactionCategory[]
+  counterparties          Counterparty[]
+  transactions            Transaction[]
+  cancelledTransactions   Transaction[]           @relation("CancelledTransactions")
+  ledgerEntries           LedgerEntry[]
+  idempotencyKeys         IdempotencyKey[]
 
   @@index([status, createdAt], map: "ix_users__status_created")
   @@map("users")
@@ -203,7 +210,8 @@ model UserPreference {
   createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency Currency @relation(fields: [defaultCurrency], references: [code], onDelete: NoAction)
 
   @@map("user_preferences")
 }
@@ -375,18 +383,22 @@ model Project {
   startsOn    DateTime?      @map("starts_on") @db.Date
   targetOn    DateTime?      @map("target_on") @db.Date
   completedOn DateTime?      @map("completed_on") @db.Date
-  color       String?        @db.VarChar(7)
-  version     Int            @default(1)
-  archivedAt  DateTime?      @map("archived_at") @db.Timestamptz(6)
-  deletedAt   DateTime?      @map("deleted_at") @db.Timestamptz(6)
-  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  color          String?        @db.VarChar(7)
+  budgetMinor    BigInt?        @map("budget_minor")
+  budgetCurrency String?        @map("budget_currency") @db.Char(3)
+  version        Int            @default(1)
+  archivedAt     DateTime?      @map("archived_at") @db.Timestamptz(6)
+  deletedAt      DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: NoAction)
-  sourceIdeas Idea[]       @relation("IdeaConvertedProject")
-  tasks       Task[]
-  tags        ProjectTag[]
-  noteLinks   NoteLink[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: NoAction)
+  currency     Currency?     @relation(fields: [budgetCurrency], references: [code], onDelete: NoAction)
+  sourceIdeas  Idea[]        @relation("IdeaConvertedProject")
+  tasks        Task[]
+  tags         ProjectTag[]
+  noteLinks    NoteLink[]
+  transactions Transaction[]
 
   @@unique([userId, id])
   @@map("projects")
@@ -565,18 +577,325 @@ model NoteLink {
   id        String   @id @db.Uuid
   userId    String   @map("user_id") @db.Uuid
   noteId    String   @map("note_id") @db.Uuid
-  ideaId    String?  @map("idea_id") @db.Uuid
-  projectId String?  @map("project_id") @db.Uuid
-  taskId    String?  @map("task_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  ideaId         String?  @map("idea_id") @db.Uuid
+  projectId      String?  @map("project_id") @db.Uuid
+  taskId         String?  @map("task_id") @db.Uuid
+  transactionId  String?  @map("transaction_id") @db.Uuid
+  counterpartyId String?  @map("counterparty_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: NoAction)
-  note    Note     @relation(fields: [userId, noteId], references: [userId, id], onDelete: Cascade)
-  idea    Idea?    @relation(fields: [userId, ideaId], references: [userId, id], onDelete: Cascade)
-  project Project? @relation(fields: [userId, projectId], references: [userId, id], onDelete: Cascade)
-  task    Task?    @relation(fields: [userId, taskId], references: [userId, id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: NoAction)
+  note         Note          @relation(fields: [userId, noteId], references: [userId, id], onDelete: Cascade)
+  idea         Idea?         @relation(fields: [userId, ideaId], references: [userId, id], onDelete: Cascade)
+  project      Project?      @relation(fields: [userId, projectId], references: [userId, id], onDelete: Cascade)
+  task         Task?         @relation(fields: [userId, taskId], references: [userId, id], onDelete: Cascade)
+  transaction  Transaction?  @relation(fields: [userId, transactionId], references: [userId, id], onDelete: Cascade)
+  counterparty Counterparty? @relation(fields: [userId, counterpartyId], references: [userId, id], onDelete: Cascade)
 
   @@unique([userId, id])
   @@index([userId, noteId], map: "ix_note_links__note")
   @@map("note_links")
+}
+
+// =============================================================================
+// M04 : Finance, cœur (PHASE-05)
+// =============================================================================
+
+enum AccountType {
+  CASH
+  MOBILE_MONEY
+  BANK
+  PAYMENT_ACCOUNT
+  OTHER
+
+  @@map("account_type")
+}
+
+enum CategoryKind {
+  INCOME
+  EXPENSE
+
+  @@map("category_kind")
+}
+
+enum CounterpartyKind {
+  PERSON
+  ORGANIZATION
+
+  @@map("counterparty_kind")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  BORROWING
+  LOAN
+  REFUND
+  ADJUSTMENT
+
+  @@map("transaction_type")
+}
+
+enum TransactionStatus {
+  PENDING
+  VALIDATED
+  CANCELLED
+
+  @@map("transaction_status")
+}
+
+enum EconomicClass {
+  INCOME_OPERATING
+  INCOME_OTHER
+  GIFT_RECEIVED
+  LOAN_COLLECTION
+  EXPENSE_OPERATING
+  EXPENSE_FEE
+  GIFT_GIVEN
+  DEBT_REPAYMENT
+  INTERNAL_TRANSFER
+  DEBT_DRAWDOWN
+  LOAN_DISBURSEMENT
+  REFUND_RECEIVED
+  REFUND_ISSUED
+  BALANCE_ADJUSTMENT
+
+  @@map("economic_class")
+}
+
+enum TransactionSource {
+  MANUAL
+  RECURRENCE
+  AUTOMATION
+  AI
+  IMPORT
+  INTEGRATION
+
+  @@map("transaction_source")
+}
+
+enum FxRateSource {
+  MANUAL
+  PROVIDER_STATEMENT
+  FIXED_PEG
+
+  @@map("fx_rate_source")
+}
+
+enum EntryDirection {
+  DEBIT
+  CREDIT
+
+  @@map("entry_direction")
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+
+  @@map("idempotency_status")
+}
+
+/// Devises supportées (globale, sans user_id).
+model Currency {
+  code        String   @id @db.Char(3)
+  numericCode Int      @map("numeric_code") @db.SmallInt
+  exponent    Int      @db.SmallInt
+  symbol      String   @db.VarChar(8)
+  nameFr      String   @map("name_fr") @db.VarChar(60)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  financialAccounts FinancialAccount[]
+  transactions      Transaction[]
+  ledgerEntries     LedgerEntry[]
+  userPreferences   UserPreference[]
+  projects          Project[]
+
+  @@map("currencies")
+}
+
+/// Comptes financiers d'un utilisateur (espèces, Wave, Orange Money, banque...).
+model FinancialAccount {
+  id                  String      @id @db.Uuid
+  userId              String      @map("user_id") @db.Uuid
+  name                String      @db.VarChar(80)
+  type                AccountType
+  provider            String?     @db.VarChar(60)
+  currency            String      @db.Char(3)
+  openingBalanceMinor BigInt      @default(0) @map("opening_balance_minor")
+  openedOn            DateTime    @map("opened_on") @db.Date
+  allowOverdraft      Boolean     @default(false) @map("allow_overdraft")
+  overdraftLimitMinor BigInt?     @map("overdraft_limit_minor")
+  includeInNetWorth   Boolean     @default(true) @map("include_in_net_worth")
+  color               String?     @db.VarChar(7)
+  icon                String?     @db.VarChar(40)
+  sortOrder           Int         @default(0) @map("sort_order")
+  notes               String?
+  archivedAt          DateTime?   @map("archived_at") @db.Timestamptz(6)
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: NoAction)
+  currencyRel   Currency      @relation(fields: [currency], references: [code], onDelete: NoAction)
+  ledgerEntries LedgerEntry[]
+
+  @@unique([userId, id])
+  @@unique([userId, id, currency])
+  @@index([userId, sortOrder], map: "ix_financial_accounts__active")
+  @@map("financial_accounts")
+}
+
+/// Catégories de transactions par utilisateur, avec hiérarchie à 1 niveau.
+model TransactionCategory {
+  id                   String                @id @db.Uuid
+  userId               String                @map("user_id") @db.Uuid
+  name                 String                @db.VarChar(60)
+  kind                 CategoryKind
+  parentId             String?               @map("parent_id") @db.Uuid
+  defaultEconomicClass EconomicClass         @map("default_economic_class")
+  isSystem             Boolean               @default(false) @map("is_system")
+  systemKey            String?               @map("system_key") @db.VarChar(80)
+  color                String?               @db.VarChar(7)
+  icon                 String?               @db.VarChar(40)
+  sortOrder            Int                   @default(0) @map("sort_order")
+  archivedAt           DateTime?             @map("archived_at") @db.Timestamptz(6)
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user         User                  @relation(fields: [userId], references: [id], onDelete: NoAction)
+  parent       TransactionCategory?  @relation("CategoryHierarchy", fields: [userId, parentId], references: [userId, id], onDelete: NoAction)
+  children     TransactionCategory[] @relation("CategoryHierarchy")
+  transactions Transaction[]
+
+  @@unique([userId, id])
+  @@unique([userId, systemKey])
+  @@index([userId, kind, sortOrder], map: "ix_transaction_categories__kind")
+  @@map("transaction_categories")
+}
+
+/// Contreparties (personnes physiques ou morales).
+model Counterparty {
+  id         String           @id @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  name       String           @db.VarChar(120)
+  kind       CounterpartyKind @default(PERSON)
+  phone      String?          @db.VarChar(20)
+  email      String?          @db.Citext
+  notes      String?
+  archivedAt DateTime?        @map("archived_at") @db.Timestamptz(6)
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: NoAction)
+  transactions Transaction[]
+  noteLinks    NoteLink[]
+
+  @@unique([userId, id])
+  @@index([userId, name], map: "ix_counterparties__active")
+  @@map("counterparties")
+}
+
+/// En-têtes de transactions financières (revenu, dépense, transfert, ajustement).
+model Transaction {
+  id                  String             @id @db.Uuid
+  userId              String             @map("user_id") @db.Uuid
+  type                TransactionType
+  status              TransactionStatus
+  economicClass       EconomicClass      @map("economic_class")
+  amountMinor         BigInt             @map("amount_minor")
+  currency            String             @db.Char(3)
+  occurredAt          DateTime           @map("occurred_at") @db.Timestamptz(6)
+  valueDate           DateTime           @map("value_date") @db.Date
+  description         String?            @db.VarChar(255)
+  notes               String?
+  categoryId          String?            @map("category_id") @db.Uuid
+  counterpartyId      String?            @map("counterparty_id") @db.Uuid
+  projectId           String?            @map("project_id") @db.Uuid
+  parentTransactionId String?            @map("parent_transaction_id") @db.Uuid
+  refundOfId          String?            @map("refund_of_id") @db.Uuid
+  rate                Decimal?           @db.Decimal(20, 10)
+  rateDate            DateTime?          @map("rate_date") @db.Date
+  rateSource          FxRateSource?      @map("rate_source")
+  source              TransactionSource  @default(MANUAL)
+  idempotencyKey      String?            @map("idempotency_key") @db.VarChar(128)
+  externalReference   String?            @map("external_reference") @db.VarChar(128)
+  validatedAt         DateTime?          @map("validated_at") @db.Timestamptz(6)
+  cancelledAt         DateTime?          @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy         String?            @map("cancelled_by") @db.Uuid
+  cancelReason        String?            @map("cancel_reason") @db.VarChar(500)
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user              User                 @relation(fields: [userId], references: [id], onDelete: NoAction)
+  currencyRel       Currency             @relation(fields: [currency], references: [code], onDelete: NoAction)
+  category          TransactionCategory? @relation(fields: [userId, categoryId], references: [userId, id], onDelete: NoAction)
+  counterparty      Counterparty?        @relation(fields: [userId, counterpartyId], references: [userId, id], onDelete: NoAction)
+  project           Project?             @relation(fields: [userId, projectId], references: [userId, id], onDelete: NoAction)
+  parentTransaction Transaction?         @relation("FeeTransactions", fields: [userId, parentTransactionId], references: [userId, id], onDelete: NoAction)
+  feeTransactions   Transaction[]        @relation("FeeTransactions")
+  refundOf          Transaction?         @relation("RefundTransactions", fields: [userId, refundOfId, currency], references: [userId, id, currency], onDelete: NoAction)
+  refunds           Transaction[]        @relation("RefundTransactions")
+  cancelledByUser   User?                @relation("CancelledTransactions", fields: [cancelledBy], references: [id], onDelete: NoAction)
+  ledgerEntries     LedgerEntry[]
+  noteLinks         NoteLink[]
+
+  @@unique([userId, id])
+  @@unique([userId, id, currency])
+  @@index([userId, valueDate(sort: Desc), id(sort: Desc)], map: "ix_transactions__journal")
+  @@index([userId, status, valueDate], map: "ix_transactions__status_date")
+  @@index([userId, categoryId, valueDate], map: "ix_transactions__category")
+  @@index([userId, counterpartyId, valueDate], map: "ix_transactions__counterparty")
+  @@index([userId, projectId], map: "ix_transactions__project")
+  @@index([userId, parentTransactionId], map: "ix_transactions__parent")
+  @@index([userId, refundOfId], map: "ix_transactions__refund_of")
+  @@index([userId, externalReference], map: "ix_transactions__external_ref")
+  @@map("transactions")
+}
+
+/// Écritures du registre comptable (au plus une par sens et par transaction).
+model LedgerEntry {
+  id            String         @id @db.Uuid
+  userId        String         @map("user_id") @db.Uuid
+  transactionId String         @map("transaction_id") @db.Uuid
+  accountId     String         @map("account_id") @db.Uuid
+  direction     EntryDirection
+  amountMinor   BigInt         @map("amount_minor")
+  currency      String         @db.Char(3)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: NoAction)
+  transaction Transaction      @relation(fields: [userId, transactionId], references: [userId, id], onDelete: NoAction)
+  account     FinancialAccount @relation(fields: [userId, accountId, currency], references: [userId, id, currency], onDelete: NoAction)
+  currencyRel Currency         @relation(fields: [currency], references: [code], onDelete: NoAction)
+
+  @@unique([userId, id])
+  @@unique([userId, transactionId, direction])
+  @@index([userId, accountId, transactionId], map: "ix_ledger_entries__account")
+  @@map("ledger_entries")
+}
+
+/// Clés d'idempotence des opérations financières et sensibles.
+model IdempotencyKey {
+  id             String            @id @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  scope          String            @db.VarChar(80)
+  key            String            @db.VarChar(128)
+  requestHash    Bytes             @map("request_hash")
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  responseStatus Int?              @map("response_status") @db.SmallInt
+  responseBody   Json?             @map("response_body")
+  resourceId     String?           @map("resource_id") @db.Uuid
+  completedAt    DateTime?         @map("completed_at") @db.Timestamptz(6)
+  expiresAt      DateTime          @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@unique([userId, scope, key])
+  @@index([expiresAt], map: "ix_idempotency_keys__expires")
+  @@map("idempotency_keys")
 }

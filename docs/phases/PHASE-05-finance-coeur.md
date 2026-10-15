@@ -1,6 +1,6 @@
 # PHASE-05 : Finance, cœur
 
-- **Statut :** À faire
+- **Statut :** En cours
 - **Dépend de :** PHASE-02, PHASE-03
 - **Accès :** Tous
 - **Estimation :** 9 à 12 jours effectifs
