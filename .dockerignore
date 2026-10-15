@@ -1,0 +1,30 @@
+# Contexte de build Docker (INFRASTRUCTURE.md §4.1) : jamais de secret, de dépendance locale ni d'artefact.
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+.git
+.github
+.husky
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/*.key
+**/*.pem
+**/.npmrc
+secrets
+.data
+playwright-report
+test-results
+e2e
+docs
+infra
+# Le front n'est pas dans l'image, mais son package.json reste visible pour le lockfile de l'espace de travail.
+apps/web/*
+!apps/web/package.json
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.log

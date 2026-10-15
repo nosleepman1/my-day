@@ -1,0 +1,194 @@
+# Production sur le VPS OVH (INFRASTRUCTURE.md §1, §10 ; ADR-038, ADR-041).
+# Lancé par infra/scripts/orbit-deploy.sh uniquement :
+#   ORBIT_SHA=<sha> GHCR_OWNER=<owner> docker compose -f compose.production.yml --env-file /etc/orbit/production/compose.env up -d --wait
+# Seul Caddy publie des ports. Aucun secret ici : uniquement des chemins de fichiers montés.
+name: orbit-production
+
+x-hardening: &hardening
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: '5' }
+
+x-api-image: &api-image ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/orbit-api:${ORBIT_SHA:?ORBIT_SHA is required}
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    <<: *hardening
+    cap_add: [NET_BIND_SERVICE]
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+      API_DOMAIN: ${API_DOMAIN:?API_DOMAIN is required}
+      API_STAGING_DOMAIN: ${API_STAGING_DOMAIN:?API_STAGING_DOMAIN is required}
+      N8N_DOMAIN: ${N8N_DOMAIN:?N8N_DOMAIN is required}
+      ADMIN_ALLOWED_CIDRS: ${ADMIN_ALLOWED_CIDRS:?ADMIN_ALLOWED_CIDRS is required}
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # Caddy seul rejoint aussi le réseau du staging : aucun autre conteneur de production n'y est visible.
+    networks: [edge, edge_staging]
+    mem_limit: 64m
+
+  api:
+    image: *api-image
+    <<: *hardening
+    env_file: ${ORBIT_ENV_DIR:-/etc/orbit/production}/compose.env
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      PORT: '3000'
+      APP_VERSION: ${ORBIT_SHA}
+      DATABASE_URL_FILE: /run/secrets/database_url
+      RATE_LIMIT_HMAC_KEY_FILE: /run/secrets/rate_limit_hmac_key
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+    secrets: [database_url, rate_limit_hmac_key, smtp_password]
+    # Alias unique : le nom de service `api` existe aussi dans le staging (revue PHASE-03, C1).
+    networks:
+      edge: { aliases: [orbit-production-api] }
+      data: {}
+    depends_on:
+      postgres: { condition: service_healthy }
+    mem_limit: 350m
+
+  # Conteneur éphémère : `docker compose run --rm migrate` (INFRASTRUCTURE.md §8.4, §9).
+  migrate:
+    image: *api-image
+    <<: *hardening
+    restart: 'no'
+    profiles: [tools]
+    environment:
+      NODE_ENV: production
+      HOME: /tmp
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - 'export DATABASE_MIGRATION_URL="$$(cat /run/secrets/database_migration_url)"; export DATABASE_URL="$$DATABASE_MIGRATION_URL"; exec node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma'
+    secrets: [database_migration_url]
+    networks: [data]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  postgres:
+    image: postgres:17.6-alpine
+    <<: *hardening
+    read_only: false
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    environment:
+      POSTGRES_USER: orbit_owner
+      POSTGRES_DB: orbit
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_owner_password
+      POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256'
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - max_connections=40
+      - -c
+      - password_encryption=scram-sha-256
+    secrets: [postgres_owner_password, orbit_app_password, orbit_backup_password]
+    volumes:
+      - ${ORBIT_DATA_DIR:-/srv/orbit/production}/pgdata:/var/lib/postgresql/data
+      - ./postgres/init-deployed:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U orbit_owner -d orbit']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [data]
+    mem_limit: 600m
+
+  # Sauvegarde : `docker compose run --rm -T backup > orbit.dump` (infra/scripts/backup.sh).
+  backup:
+    image: postgres:17.6-alpine
+    <<: *hardening
+    restart: 'no'
+    profiles: [tools]
+    entrypoint: ['/bin/sh', '-c']
+    command: ['exec pg_dump --format=custom --no-owner "$$(cat /run/secrets/database_backup_url)"']
+    secrets: [database_backup_url]
+    networks: [data]
+    mem_limit: 256m
+
+  n8n:
+    image: n8nio/n8n:1.110.1
+    <<: *hardening
+    read_only: false
+    env_file: ${ORBIT_ENV_DIR:-/etc/orbit/production}/n8n.env
+    environment:
+      N8N_ENCRYPTION_KEY_FILE: /run/secrets/n8n_encryption_key
+      N8N_PROXY_HOPS: '1'
+      N8N_SECURE_COOKIE: 'true'
+      N8N_DIAGNOSTICS_ENABLED: 'false'
+      N8N_PERSONALIZATION_ENABLED: 'false'
+      DB_TYPE: sqlite
+      EXECUTIONS_DATA_PRUNE: 'true'
+      EXECUTIONS_DATA_MAX_AGE: '336'
+      GENERIC_TIMEZONE: Africa/Dakar
+      # Aucun workflow ne lance de commande système ni ne lit l'environnement du conteneur.
+      NODES_EXCLUDE: '["n8n-nodes-base.executeCommand","n8n-nodes-base.ssh"]'
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: 'true'
+    secrets: [n8n_encryption_key]
+    volumes:
+      - /srv/orbit/n8n:/home/node/.n8n
+    networks: [edge]
+    mem_limit: 512m
+
+  # Interface consultée par tunnel SSH uniquement (aucun port publié, INFRASTRUCTURE.md §5.1).
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.16
+    <<: *hardening
+    read_only: false
+    cap_add: [CHOWN, SETGID, SETUID]
+    volumes:
+      - /srv/orbit/uptime-kuma:/app/data
+    networks: [edge]
+    mem_limit: 150m
+
+networks:
+  # Réseau public de la production (Caddy, API, n8n, Uptime Kuma).
+  edge:
+    name: orbit-edge
+  # Réseau du staging : seuls Caddy et l'API de staging (alias orbit-staging-api) s'y trouvent.
+  # Créé par orbit-deploy s'il manque : le staging peut être déployé avant la production.
+  edge_staging:
+    name: orbit-edge-staging
+    external: true
+  # Bases : aucune sortie Internet.
+  data:
+    internal: true
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  database_url:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/production/secrets}/database_url
+  database_migration_url:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/production/secrets}/database_migration_url
+  database_backup_url:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/production/secrets}/database_backup_url
+  rate_limit_hmac_key:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/production/secrets}/rate_limit_hmac_key
+  smtp_password:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/production/secrets}/smtp_password
+  postgres_owner_password:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/production/secrets}/postgres_owner_password
+  orbit_app_password:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/production/secrets}/orbit_app_password
+  orbit_backup_password:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/production/secrets}/orbit_backup_password
+  n8n_encryption_key:
+    file: ${ORBIT_SECRETS_DIR:-/etc/orbit/production/secrets}/n8n_encryption_key

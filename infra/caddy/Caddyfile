@@ -1,0 +1,77 @@
+# Caddy du VPS (INFRASTRUCTURE.md §5, ADR-038) : TLS automatique pour l'API (production et staging)
+# et n8n uniquement ; le front est servi par Vercel. Domaines et adresses lus depuis l'environnement.
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+# Journal d'accès JSON sans cookie, sans en-tête d'autorisation et avec IP tronquée (SECURITY.md §9.1).
+(access_log) {
+	log {
+		output stdout
+		format filter {
+			wrap json
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+			request>headers>Proxy-Authorization delete
+			request>uri regexp \?.* ?REDACTED
+			request>headers>X-Api-Key delete
+			resp_headers>Set-Cookie delete
+			request>remote_ip ip_mask 24 48
+			request>client_ip ip_mask 24 48
+			request>headers>X-Forwarded-For delete
+		}
+	}
+}
+
+(api_common) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Cross-Origin-Resource-Policy "same-origin"
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		-Server
+	}
+	@outside_api not path /api/*
+	respond @outside_api 404
+	request_body {
+		max_size 25MB
+	}
+	import access_log
+}
+
+{$API_DOMAIN} {
+	import api_common
+	reverse_proxy orbit-production-api:3000 {
+		header_up X-Request-Id {http.request.uuid}
+		health_uri /api/v1/health/live
+	}
+}
+
+{$API_STAGING_DOMAIN} {
+	import api_common
+	reverse_proxy orbit-staging-api:3000 {
+		header_up X-Request-Id {http.request.uuid}
+	}
+}
+
+{$N8N_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	# Éditeur n8n réservé aux IP d'administration (ou au VPN) ; seuls les webhooks restent publics.
+	@editor {
+		not path /webhook/* /webhook-test/*
+		not remote_ip {$ADMIN_ALLOWED_CIDRS}
+	}
+	respond @editor 403
+	reverse_proxy n8n:5678
+	import access_log
+}
