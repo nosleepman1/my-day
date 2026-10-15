@@ -25,3 +25,24 @@ export const organizationKeys = {
     [...organizationKeys.all, resource, 'item', id, part] as const,
   tags: () => [...organizationKeys.all, 'tags'] as const,
 };
+
+/**
+ * Finance (M04 / PHASE-05) : comptes, transactions, rapports, catégories et contreparties.
+ */
+export const financeKeys = {
+  all: ['finance'] as const,
+  accounts: (params?: Params) => [...financeKeys.all, 'accounts', params] as const,
+  account: (id: string) => [...financeKeys.all, 'account', id] as const,
+  reconciliationPreview: (id: string, date?: string) =>
+    [...financeKeys.account(id), 'reconciliation', date] as const,
+  categories: (params?: Params) => [...financeKeys.all, 'categories', params] as const,
+  counterparties: (params?: Params) => [...financeKeys.all, 'counterparties', params] as const,
+  transactions: (params?: Params) => [...financeKeys.all, 'transactions', params] as const,
+  transaction: (id: string) => [...financeKeys.all, 'transaction', id] as const,
+  reports: {
+    summary: (params?: Params) => [...financeKeys.all, 'reports', 'summary', params] as const,
+    balances: () => [...financeKeys.all, 'reports', 'balances'] as const,
+    byCategory: (params?: Params) => [...financeKeys.all, 'reports', 'by-category', params] as const,
+    cashflow: (params?: Params) => [...financeKeys.all, 'reports', 'cashflow', params] as const,
+  },
+};

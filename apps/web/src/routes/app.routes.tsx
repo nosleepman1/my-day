@@ -10,6 +10,9 @@ import { MorePage } from '@/app/shell/more-page';
 import { useTheme } from '@/app/theme';
 
 import {
+  AccountDetailPage,
+  AccountsPage,
+  FinanceOverviewPage,
   HomePage,
   IdeaDetailPage,
   IdeasPage,
@@ -28,6 +31,24 @@ import {
   TaskDetailPage,
   TasksPage,
 } from './lazy-pages';
+
+/** Finances (PHASE-05) : chaque écran est gardé par son module (`enabled_modules`, ADR-024). */
+const financeRoutes: RouteObject[] = [
+  {
+    path: '/finance',
+    element: <ModuleGate module="finance" />,
+    children: [
+      { index: true, element: <FinanceOverviewPage /> },
+      {
+        path: 'accounts',
+        children: [
+          { index: true, element: <AccountsPage /> },
+          { path: ':id', element: <AccountDetailPage /> },
+        ],
+      },
+    ],
+  },
+];
 
 /** Organisation (PHASE-04) : chaque écran est gardé par son module (`enabled_modules`, ADR-024). */
 const organizationRoutes: RouteObject[] = [
@@ -101,6 +122,7 @@ export const appRoutes: RouteObject[] = [
                 ],
               },
               ...organizationRoutes,
+              ...financeRoutes,
               ...upcomingRoutes,
               { path: '*', element: <NotFoundPage /> },
             ],

@@ -2,10 +2,12 @@ import { lazy, Suspense, type JSX, type ReactNode } from 'react';
 
 import { BootScreen } from '@/app/shell/boot-screen';
 import type * as AuthExports from '@/features/auth';
+import type * as FinanceExports from '@/features/finance';
 import type * as OrganizationExports from '@/features/organization';
 import type * as SettingsExports from '@/features/settings';
 
 type AuthModule = typeof AuthExports;
+type FinanceModule = typeof FinanceExports;
 type SettingsModule = typeof SettingsExports;
 
 /**
@@ -58,6 +60,16 @@ export const NoteDetailPage = lazy(() =>
   organization().then((module) => ({ default: module.NoteDetailPage })),
 );
 export const TagsPage = lazy(() => organization().then((module) => ({ default: module.TagsPage })));
+
+const finance = (): Promise<FinanceModule> => import('@/features/finance');
+
+export const FinanceOverviewPage = lazy(() =>
+  finance().then((module) => ({ default: module.FinanceOverviewPage })),
+);
+export const AccountsPage = lazy(() => finance().then((module) => ({ default: module.AccountsPage })));
+export const AccountDetailPage = lazy(() =>
+  finance().then((module) => ({ default: module.AccountDetailPage })),
+);
 
 /** Écran de démarrage pendant le chargement d'une page hors shell (publique ou onboarding). */
 export function Suspended({ children }: Readonly<{ children: ReactNode }>): JSX.Element {

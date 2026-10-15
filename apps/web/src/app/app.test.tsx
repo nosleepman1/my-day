@@ -136,8 +136,11 @@ describe('shell and navigation', () => {
   });
 
   it('shows « coming soon » for an enabled module and « disabled » otherwise', async () => {
-    mockSession();
-    const { router } = renderApp('/finance');
+    mockSession(
+      sessionUser(),
+      preferences({ enabledModules: ['ideas', 'tasks', 'notes', 'finance', 'debts'] }),
+    );
+    const { router } = renderApp('/finance/debts');
 
     expect(await screen.findByText('Bientôt disponible')).toBeInTheDocument();
     await router.navigate('/pro');
