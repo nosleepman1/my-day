@@ -11,15 +11,21 @@ import {
   CreateAccountSchema,
   CreateCategorySchema,
   CreateCounterpartySchema,
+  CreateTransactionSchema,
+  CancelTransactionSchema,
   IdParamSchema,
   ListAccountsQuerySchema,
   ListCategoriesQuerySchema,
   ListCounterpartiesQuerySchema,
+  ListTransactionsQuerySchema,
   MergeCounterpartySchema,
   ReopenAccountSchema,
+  TransactionEnvelopeSchema,
+  TransactionListEnvelopeSchema,
   UpdateAccountSchema,
   UpdateCategorySchema,
   UpdateCounterpartySchema,
+  UpdateTransactionDetailsSchema,
 } from '@orbit/contracts';
 
 export class IdParamDto extends createZodDto(IdParamSchema) {}
@@ -47,3 +53,11 @@ export class ListCounterpartiesQueryDto extends createZodDto(ListCounterpartiesQ
 
 export class CounterpartyEnvelopeDto extends createZodDto(CounterpartyEnvelopeSchema) {}
 export class CounterpartyListEnvelopeDto extends createZodDto(CounterpartyListEnvelopeSchema) {}
+
+export class CreateTransactionDto extends createZodDto(CreateTransactionSchema) {}
+export class UpdateTransactionDetailsDto extends createZodDto(UpdateTransactionDetailsSchema) {}
+export class CancelTransactionDto extends createZodDto(CancelTransactionSchema) {}
+export class ListTransactionsQueryDto extends createZodDto(ListTransactionsQuerySchema) {}
+
+export class TransactionEnvelopeDto extends createZodDto(TransactionEnvelopeSchema) {}
+export class TransactionListEnvelopeDto extends createZodDto(TransactionListEnvelopeSchema) {}

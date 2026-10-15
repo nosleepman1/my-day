@@ -64,11 +64,17 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
     link: string;
   }>;
 
-  async function createAs(user: SignedInUser, path: string, body: object): Promise<string> {
+  async function createAs(
+    user: SignedInUser,
+    path: string,
+    body: object,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<string> {
     const response = await http()
       .post(`/api/v1${path}`)
       .set(CSRF_HEADERS)
       .set('Cookie', user.cookie)
+      .set(extraHeaders)
       .send(body)
       .expect((res) => {
         if (res.status !== 200 && res.status !== 201) throw new Error(`${path} → ${res.status}`);
@@ -182,6 +188,7 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
     account: string;
     category: string;
     counterparty: string;
+    transaction: string;
   }>;
 
   async function financeFixture(owner: SignedInUser): Promise<FinanceFixture> {
@@ -200,7 +207,21 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       name: `Contrepartie ${randomUUID().slice(0, 8)}`,
       kind: 'PERSON',
     });
-    return { account, category, counterparty };
+    const transaction = await createAs(
+      owner,
+      '/finance/transactions',
+      {
+        type: 'INCOME',
+        status: 'PENDING',
+        accountId: account,
+        amountMinor: '10000',
+        currency: 'XOF',
+        occurredAt: '2026-02-01T10:00:00.000Z',
+        valueDate: '2026-02-01',
+      },
+      { 'Idempotency-Key': randomUUID() },
+    );
+    return { account, category, counterparty, transaction };
   }
 
   type FinanceCase = Readonly<{
@@ -255,6 +276,22 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
     'DELETE /api/v1/finance/counterparties/:id': atFinance(
       'delete',
       (f) => `/finance/counterparties/${f.counterparty}`,
+    ),
+    'GET /api/v1/finance/transactions/:id': atFinance('get', (f) => `/finance/transactions/${f.transaction}`),
+    'PATCH /api/v1/finance/transactions/:id': atFinance(
+      'patch',
+      (f) => `/finance/transactions/${f.transaction}`,
+      {
+        body: () => ({ description: 'Nouveau libellé' }),
+      },
+    ),
+    'POST /api/v1/finance/transactions/:id/validate': atFinance(
+      'post',
+      (f) => `/finance/transactions/${f.transaction}/validate`,
+    ),
+    'DELETE /api/v1/finance/transactions/:id': atFinance(
+      'delete',
+      (f) => `/finance/transactions/${f.transaction}`,
     ),
   };
 

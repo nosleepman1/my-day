@@ -24,6 +24,17 @@ export const AUDIT_ACTIONS = [
   'organization.task.status_change',
   'organization.task.due_change',
   'organization.tag.merge',
+  'finance.account.create',
+  'finance.account.update',
+  'finance.account.close',
+  'finance.account.reopen',
+  'finance.transaction.create',
+  'finance.transaction.update',
+  'finance.transaction.validate',
+  'finance.transaction.cancel',
+  'finance.transaction.delete',
+  'finance.adjustment.create',
+  'finance.transfer.create',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -7,6 +7,7 @@ import { PasswordHasherModule } from './auth/password-hasher.module';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { GlobalExceptionFilter } from './http/global-exception.filter';
+import { IdempotencyModule } from './idempotency/idempotency.module';
 import { IdsModule } from './ids/ids.module';
 import { MailModule } from './mail/mail.module';
 import { HealthController } from './observability/health.controller';
@@ -24,6 +25,7 @@ import { TimeModule } from './time/time.module';
     ObservabilityModule,
     TenantModule,
     AuditModule,
+    IdempotencyModule,
     DatabaseModule,
     IdsModule,
     TimeModule,

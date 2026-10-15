@@ -10,10 +10,14 @@ import { CounterpartiesController } from './counterparties/counterparties.contro
 import { CounterpartiesRepository } from './counterparties/counterparties.repository';
 import { CounterpartiesService } from './counterparties/counterparties.service';
 import { FinanceContext } from './shared/finance-context';
+import { TransactionReferences } from './transactions/transaction-references';
+import { TransactionsController } from './transactions/transactions.controller';
+import { TransactionsRepository } from './transactions/transactions.repository';
+import { TransactionsService } from './transactions/transactions.service';
 
 /** M04 Finance (PHASE-05) : comptes, catégories, contreparties, transactions, grand livre. */
 @Module({
-  controllers: [AccountsController, CategoriesController, CounterpartiesController],
+  controllers: [AccountsController, CategoriesController, CounterpartiesController, TransactionsController],
   providers: [
     FinanceContext,
     AccountsRepository,
@@ -22,6 +26,9 @@ import { FinanceContext } from './shared/finance-context';
     CategoriesService,
     CounterpartiesRepository,
     CounterpartiesService,
+    TransactionReferences,
+    TransactionsRepository,
+    TransactionsService,
   ],
   exports: [
     FinanceContext,
@@ -31,6 +38,9 @@ import { FinanceContext } from './shared/finance-context';
     CategoriesService,
     CounterpartiesRepository,
     CounterpartiesService,
+    TransactionReferences,
+    TransactionsRepository,
+    TransactionsService,
   ],
 })
 export class FinanceModule {}
