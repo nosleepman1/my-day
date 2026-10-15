@@ -28,8 +28,8 @@ export const CAPTURE_TYPES: readonly CaptureType[] = [
   { key: 'idea', icon: Lightbulb, module: 'ideas', phase: 4, ready: true },
   { key: 'task', icon: CheckSquare, module: 'tasks', phase: 4, ready: true },
   { key: 'note', icon: NotebookText, module: 'notes', phase: 4, ready: true },
-  { key: 'expense', icon: ArrowUpRight, module: 'finance', phase: 5, ready: false },
-  { key: 'income', icon: ArrowDownLeft, module: 'finance', phase: 5, ready: false },
+  { key: 'expense', icon: ArrowUpRight, module: 'finance', phase: 5, ready: true },
+  { key: 'income', icon: ArrowDownLeft, module: 'finance', phase: 5, ready: true },
 ];
 
 export function availableCaptureTypes(enabledModules: readonly UserModule[]): readonly CaptureType[] {

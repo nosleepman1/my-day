@@ -1,9 +1,14 @@
 import { http, HttpResponse } from 'msw';
 
 import type {
+  AccountAdjustmentInput,
   AccountResponse,
   BalancesReport,
   CategoryResponse,
+  ConfirmReconciliation,
+  CounterpartyResponse,
+  CreateCategory,
+  CreateCounterparty,
   CreateTransactionInput,
   CreateTransferInput,
   TransactionResponse,
@@ -73,6 +78,21 @@ export function categoryFixture(overrides: Partial<CategoryResponse> = {}): Cate
     icon: null,
     color: '#ffaa00',
     isSystem: true,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+export function counterpartyFixture(overrides: Partial<CounterpartyResponse> = {}): CounterpartyResponse {
+  return {
+    id: ID(30),
+    name: 'Auchan Supermarché',
+    kind: 'ORGANIZATION',
+    phone: null,
+    email: null,
+    notes: 'Alimentation générale',
+    archivedAt: null,
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,
@@ -232,14 +252,157 @@ function registerTransferMutation(
   );
 }
 
-function registerFinanceAuxRoutes(balances: BalancesReport): void {
+function registerSummaryAndBalancesRoutes(balances: BalancesReport): void {
   server.use(
     http.get('/api/v1/finance/reports/balances', () => HttpResponse.json({ data: balances })),
-    http.get('/api/v1/finance/categories', () => HttpResponse.json({ data: [categoryFixture()] })),
-    http.get('/api/v1/finance/counterparties', () =>
-      HttpResponse.json({ data: [], meta: { limit: 25, nextCursor: null, hasMore: false } }),
+    http.get('/api/v1/finance/reports/summary', () =>
+      HttpResponse.json({
+        data: {
+          period: { from: '2026-10-01', to: '2026-10-31' },
+          summaries: [
+            {
+              currency: 'XOF',
+              incomeMinor: '500000',
+              expenseMinor: '200000',
+              netMinor: '300000',
+              otherIncomeMinor: '0',
+              adjustmentsMinor: '0',
+            },
+          ],
+        },
+      }),
     ),
   );
+}
+
+function registerBreakdownAndCashflowRoutes(): void {
+  server.use(
+    http.get('/api/v1/finance/reports/by-category', () =>
+      HttpResponse.json({
+        data: {
+          period: { fromDate: '2026-10-01', toDate: '2026-10-31' },
+          currency: 'XOF',
+          kind: 'EXPENSE',
+          totalMinor: '200000',
+          categories: [
+            {
+              categoryId: ID(20),
+              categoryName: 'Alimentation',
+              amountMinor: '200000',
+              percentage: 100,
+            },
+          ],
+        },
+      }),
+    ),
+    http.get('/api/v1/finance/reports/cashflow', () =>
+      HttpResponse.json({
+        data: {
+          period: { fromDate: '2026-01-01', toDate: '2026-12-31' },
+          currency: 'XOF',
+          totalIncomeMinor: '500000',
+          totalExpenseMinor: '200000',
+          netCashFlowMinor: '300000',
+          byEconomicClass: {},
+          byMonth: [{ month: '2026-10', incomeMinor: '500000', expenseMinor: '200000', netMinor: '300000' }],
+        },
+      }),
+    ),
+  );
+}
+
+function registerCategoryAndCounterpartyRoutes(): void {
+  const categoriesState = [categoryFixture()];
+  const counterpartiesState = [counterpartyFixture()];
+
+  server.use(
+    http.get('/api/v1/finance/categories', () => HttpResponse.json({ data: categoriesState })),
+    http.post('/api/v1/finance/categories', async ({ request }) => {
+      const body = (await request.json()) as CreateCategory;
+      const newCat = categoryFixture({
+        id: ID(categoriesState.length + 20),
+        name: body.name,
+        kind: body.kind,
+        defaultEconomicClass: body.defaultEconomicClass,
+        color: body.color ?? null,
+        isSystem: false,
+      });
+      categoriesState.push(newCat);
+      return HttpResponse.json({ data: newCat }, { status: 201 });
+    }),
+    http.get('/api/v1/finance/counterparties', () =>
+      HttpResponse.json({
+        data: counterpartiesState,
+        meta: { limit: 25, nextCursor: null, hasMore: false },
+      }),
+    ),
+    http.post('/api/v1/finance/counterparties', async ({ request }) => {
+      const body = (await request.json()) as CreateCounterparty;
+      const newCp = counterpartyFixture({
+        id: ID(counterpartiesState.length + 30),
+        name: body.name,
+        kind: body.kind,
+        notes: body.notes ?? null,
+      });
+      counterpartiesState.push(newCp);
+      return HttpResponse.json({ data: newCp }, { status: 201 });
+    }),
+  );
+}
+
+function registerAdjustmentAndReconciliationRoutes(): void {
+  server.use(
+    http.post('/api/v1/finance/accounts/:id/adjustments', async ({ request }) => {
+      const body = (await request.json()) as AccountAdjustmentInput;
+      return HttpResponse.json(
+        {
+          data: transactionFixture({
+            type: 'ADJUSTMENT',
+            amountMinor: body.amountMinor,
+            description: body.reason,
+          }),
+        },
+        { status: 201 },
+      );
+    }),
+    http.get('/api/v1/finance/accounts/:id/reconciliations', ({ params }) =>
+      HttpResponse.json({
+        data: {
+          accountId: params['id'],
+          statementDate: '2026-10-15',
+          statementEndingBalanceMinor: '150000',
+          clearedBalanceMinor: '150000',
+          differenceMinor: '0',
+          isBalanced: true,
+          unreconciledCount: 0,
+        },
+      }),
+    ),
+    http.post('/api/v1/finance/accounts/:id/reconciliations', async ({ params, request }) => {
+      const body = (await request.json()) as ConfirmReconciliation;
+      return HttpResponse.json(
+        {
+          data: {
+            accountId: params['id'],
+            statementDate: body.statementDate,
+            statementEndingBalanceMinor: body.statementEndingBalanceMinor,
+            clearedBalanceMinor: body.statementEndingBalanceMinor,
+            differenceMinor: '0',
+            isBalanced: true,
+            adjustmentTransaction: null,
+          },
+        },
+        { status: 201 },
+      );
+    }),
+  );
+}
+
+function registerFinanceAuxRoutes(balances: BalancesReport): void {
+  registerSummaryAndBalancesRoutes(balances);
+  registerBreakdownAndCashflowRoutes();
+  registerCategoryAndCounterpartyRoutes();
+  registerAdjustmentAndReconciliationRoutes();
 }
 
 export function mockFinanceEndpoints({

@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import type { UserModule } from '@orbit/contracts';
@@ -12,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Input, Textarea } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { DESKTOP_QUERY, useMediaQuery } from '@/hooks/use-media-query';
+import { useOnlineStatus } from '@/hooks/use-online-status';
 import { cn } from '@/lib/cn';
 import type { CaptureKind } from '@/lib/offline/capture-queue';
 import { organizationKeys } from '@/lib/query-keys';
@@ -130,58 +132,221 @@ function DueDateOption({
   );
 }
 
+function FinanceCaptureAction({
+  isOnline,
+  selected,
+  text,
+  onDone,
+}: Readonly<{
+  isOnline: boolean;
+  selected: 'expense' | 'income';
+  text: string;
+  onDone: () => void;
+}>): JSX.Element {
+  const { t } = useTranslation(['finance', 'capture', 'common']);
+  const navigate = useNavigate();
+  if (!isOnline) {
+    return (
+      <p role="alert" className="rounded-md bg-surface-muted px-3 py-2 text-small text-danger">
+        {t('finance:offlineWarning')}
+      </p>
+    );
+  }
+  const typeParam = selected === 'expense' ? 'EXPENSE' : 'INCOME';
+  const handleOpen = (): void => {
+    const descParam = text.trim() !== '' ? `&description=${encodeURIComponent(text.trim())}` : '';
+    void navigate(`/finance/transactions/new?type=${typeParam}${descParam}`);
+    onDone();
+  };
+  return (
+    <Button type="button" className="self-end" onClick={handleOpen}>
+      {t('capture:submit')}
+    </Button>
+  );
+}
+
+function StandardCaptureAction({
+  kind,
+  dueDate,
+  setDueDate,
+  error,
+  pending,
+  disabled,
+}: Readonly<{
+  kind: CaptureKind | null;
+  dueDate: string;
+  setDueDate: (val: string) => void;
+  error: unknown;
+  pending: boolean;
+  disabled: boolean;
+}>): JSX.Element {
+  const { t } = useTranslation('capture');
+  return (
+    <>
+      {kind === 'task' && <DueDateOption value={dueDate} onChange={setDueDate} />}
+      <FormError error={error} />
+      <Button type="submit" className="self-end" disabled={disabled || pending}>
+        {t('submit')}
+      </Button>
+    </>
+  );
+}
+
 type CaptureBodyProps = Readonly<{
   enabledModules: readonly UserModule[];
   ownerId: string;
   onDone: () => void;
 }>;
 
-/** Saisie, type, champs avancés repliés (échéance d'une tâche), envoi ou mise en file hors ligne. */
+interface SubmitDispatcherOptions {
+  selected: CaptureTypeKey | null;
+  isOnline: boolean;
+  text: string;
+  dueDate: string;
+  pending: boolean;
+  kind: CaptureKind | null;
+  submit: (k: CaptureKind, t: string, d: string) => Promise<void>;
+  onDone: () => void;
+}
+
+function useSubmitDispatcher({
+  selected,
+  isOnline,
+  text,
+  dueDate,
+  pending,
+  kind,
+  submit,
+  onDone,
+}: SubmitDispatcherOptions) {
+  const navigate = useNavigate();
+  return (event?: SyntheticEvent): void => {
+    event?.preventDefault();
+    if (selected === 'expense' || selected === 'income') {
+      if (!isOnline) return;
+      const typeParam = selected === 'expense' ? 'EXPENSE' : 'INCOME';
+      const descParam = text.trim() !== '' ? `&description=${encodeURIComponent(text.trim())}` : '';
+      void navigate(`/finance/transactions/new?type=${typeParam}${descParam}`);
+      onDone();
+      return;
+    }
+    if (kind !== null && text.trim() !== '' && !pending) void submit(kind, text, dueDate);
+  };
+}
+
+function CaptureContent({
+  selected,
+  isOnline,
+  text,
+  onDone,
+  kind,
+  current,
+  dueDate,
+  setDueDate,
+  error,
+  pending,
+}: Readonly<{
+  selected: CaptureTypeKey | null;
+  isOnline: boolean;
+  text: string;
+  onDone: () => void;
+  kind: CaptureKind | null;
+  current?: CaptureType;
+  dueDate: string;
+  setDueDate: (val: string) => void;
+  error: unknown;
+  pending: boolean;
+}>): JSX.Element {
+  const { t } = useTranslation('capture');
+  if (selected === 'expense' || selected === 'income') {
+    return <FinanceCaptureAction isOnline={isOnline} selected={selected} text={text} onDone={onDone} />;
+  }
+  if (kind === null) {
+    return (
+      <p role="status" className="rounded-md bg-surface-muted px-3 py-2 text-small text-muted-foreground">
+        {current === undefined ? t('noType') : t('soon', { phase: String(current.phase).padStart(2, '0') })}
+      </p>
+    );
+  }
+  return (
+    <StandardCaptureAction
+      kind={kind}
+      dueDate={dueDate}
+      setDueDate={setDueDate}
+      error={error}
+      pending={pending}
+      disabled={text.trim() === ''}
+    />
+  );
+}
+
+function CaptureInput({
+  text,
+  onChange,
+  onSubmit,
+}: Readonly<{
+  text: string;
+  onChange: (val: string) => void;
+  onSubmit: () => void;
+}>): JSX.Element {
+  const { t } = useTranslation('capture');
+  return (
+    <Textarea
+      aria-label={t('inputLabel')}
+      placeholder={t('placeholder')}
+      enterKeyHint="send"
+      rows={3}
+      value={text}
+      onChange={(e) => {
+        onChange(e.target.value);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          onSubmit();
+        }
+      }}
+    />
+  );
+}
+
 function CaptureBody({ enabledModules, ownerId, onDone }: CaptureBodyProps): JSX.Element {
-  const { t } = useTranslation(['capture', 'common']);
+  const isOnline = useOnlineStatus();
   const types = availableCaptureTypes(enabledModules);
   const [selected, setSelected] = useState<CaptureTypeKey | null>(types[0]?.key ?? null);
   const [text, setText] = useState('');
   const [dueDate, setDueDate] = useState('');
   const { pending, error, submit } = useCaptureSubmit(ownerId, onDone);
+  const isFinance = selected === 'expense' || selected === 'income';
   const current = types.find((type) => type.key === selected);
-  const kind = current?.ready === true ? (current.key as CaptureKind) : null;
-  const onSubmit = (event?: SyntheticEvent): void => {
-    event?.preventDefault();
-    if (kind !== null && text.trim() !== '' && !pending) void submit(kind, text, dueDate);
-  };
+  const kind = current?.ready === true && !isFinance ? (current.key as CaptureKind) : null;
+  const onSubmit = useSubmitDispatcher({
+    selected,
+    isOnline,
+    text,
+    dueDate,
+    pending,
+    kind,
+    submit,
+    onDone,
+  });
+
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <Textarea
-        aria-label={t('inputLabel')}
-        placeholder={t('placeholder')}
-        enterKeyHint="send"
-        rows={3}
-        value={text}
-        onChange={(event) => {
-          setText(event.target.value);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            onSubmit();
-          }
-        }}
-      />
+      <CaptureInput text={text} onChange={setText} onSubmit={onSubmit} />
       <TypePicker types={types} selected={selected} onSelect={setSelected} />
-      {kind === null ? (
-        <p role="status" className="rounded-md bg-surface-muted px-3 py-2 text-small text-muted-foreground">
-          {current === undefined ? t('noType') : t('soon', { phase: String(current.phase).padStart(2, '0') })}
-        </p>
-      ) : (
-        <>
-          {kind === 'task' && <DueDateOption value={dueDate} onChange={setDueDate} />}
-          <FormError error={error} />
-          <Button type="submit" className="self-end" disabled={pending || text.trim() === ''}>
-            {t('submit')}
-          </Button>
-        </>
-      )}
+      <CaptureContent
+        selected={selected}
+        isOnline={isOnline}
+        text={text}
+        onDone={onDone}
+        kind={kind}
+        current={current}
+        dueDate={dueDate}
+        setDueDate={setDueDate}
+        error={error}
+        pending={pending}
+      />
     </form>
   );
 }

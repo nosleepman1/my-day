@@ -5,5 +5,8 @@ export { TransactionsPage } from './pages/transactions-page';
 export { TransactionDetailPage } from './pages/transaction-detail-page';
 export { TransactionFormPage } from './pages/transaction-form-page';
 export { TransferFormPage } from './pages/transfer-form-page';
+export { CategoriesPage } from './pages/categories-page';
+export { CounterpartiesPage } from './pages/counterparties-page';
+export { ReportsPage } from './pages/reports-page';
 export { financeApi } from './api/finance.api';
 export * from './api/hooks';

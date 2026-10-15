@@ -291,18 +291,23 @@ function TransferFormHeader(): JSX.Element {
   );
 }
 
-export function TransferFormPage(): JSX.Element {
+interface TransferSubmitOptions {
+  form: TransferFormState;
+  fromCurrency: CurrencyCode;
+  toCurrency: CurrencyCode;
+  isValid: boolean;
+  idempotencyKey: string;
+}
+
+function useTransferSubmit({
+  form,
+  fromCurrency,
+  toCurrency,
+  isValid,
+  idempotencyKey,
+}: TransferSubmitOptions) {
   const { t } = useTranslation('finance');
   const navigate = useNavigate();
-  const online = useOnlineStatus();
-  const [idempotencyKey] = useState(uuidv7);
-  const [form, setForm] = useState<TransferFormState>(initialTransferState);
-
-  const accounts = useFinanceAccounts({ archived: false }).data?.data ?? [];
-  const fromCurrency = safeCurrency(accounts.find((a) => a.id === form.fromAccountId)?.currency);
-  const toCurrency = safeCurrency(accounts.find((a) => a.id === form.toAccountId)?.currency);
-  const { sameAccount, isValid } = validateTransfer(form, online);
-
   const mutation = useFinanceMutation(
     (input: CreateTransferInput) => financeApi.createTransfer(input, idempotencyKey),
     { successMessage: t('transfer.success') },
@@ -317,6 +322,54 @@ export function TransferFormPage(): JSX.Element {
     });
   };
 
+  return { mutation, handleSubmit };
+}
+
+function TransferFormSections({
+  state,
+  accounts,
+  fromCurrency,
+  toCurrency,
+  onChange,
+}: Readonly<{
+  state: TransferFormState;
+  accounts: readonly AccountResponse[];
+  fromCurrency: CurrencyCode;
+  toCurrency: CurrencyCode;
+  onChange: (patch: Partial<TransferFormState>) => void;
+}>): JSX.Element {
+  return (
+    <>
+      <TransferAccountsSection state={state} accounts={accounts} onChange={onChange} />
+      <TransferAmountsSection
+        state={state}
+        fromCurrency={fromCurrency}
+        toCurrency={toCurrency}
+        onChange={onChange}
+      />
+      <TransferMetaSection state={state} onChange={onChange} />
+    </>
+  );
+}
+
+export function TransferFormPage(): JSX.Element {
+  const { t } = useTranslation('finance');
+  const online = useOnlineStatus();
+  const [idempotencyKey] = useState(uuidv7);
+  const [form, setForm] = useState<TransferFormState>(initialTransferState);
+
+  const accounts = useFinanceAccounts({ archived: false }).data?.data ?? [];
+  const fromCurrency = safeCurrency(accounts.find((a) => a.id === form.fromAccountId)?.currency);
+  const toCurrency = safeCurrency(accounts.find((a) => a.id === form.toAccountId)?.currency);
+  const { sameAccount, isValid } = validateTransfer(form, online);
+  const { mutation, handleSubmit } = useTransferSubmit({
+    form,
+    fromCurrency,
+    toCurrency,
+    isValid,
+    idempotencyKey,
+  });
+
   return (
     <main className="flex flex-col gap-6 p-4 sm:p-6 max-w-2xl">
       <TransferFormHeader />
@@ -329,23 +382,11 @@ export function TransferFormPage(): JSX.Element {
         </Card>
       )}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <TransferAccountsSection
+        <TransferFormSections
           state={form}
           accounts={accounts}
-          onChange={(p) => {
-            setForm((c) => ({ ...c, ...p }));
-          }}
-        />
-        <TransferAmountsSection
-          state={form}
           fromCurrency={fromCurrency}
           toCurrency={toCurrency}
-          onChange={(p) => {
-            setForm((c) => ({ ...c, ...p }));
-          }}
-        />
-        <TransferMetaSection
-          state={form}
           onChange={(p) => {
             setForm((c) => ({ ...c, ...p }));
           }}

@@ -12,7 +12,9 @@ import { Badge } from '@/components/ui/misc';
 
 import { financeApi } from '../api/finance.api';
 import { useFinanceAccount, useFinanceMutation, useFinanceTransactions } from '../api/hooks';
+import { AdjustBalanceDialog } from '../components/adjust-balance-dialog';
 import { ConfirmButton, PageHeader, useDates } from '../components/common';
+import { ReconcileDialog } from '../components/reconcile-dialog';
 
 function AccountInfoCard({ account }: Readonly<{ account: AccountResponse }>): JSX.Element {
   const { t } = useTranslation('finance');
@@ -168,9 +170,8 @@ export function AccountDetailPage(): JSX.Element {
         <h2 className="text-h3">{t('accounts.entries')}</h2>
         <AccountTransactionsList transactions={transactions} />
       </div>
-      {/* Dialogue state placeholders for T15 full dialog hooks */}
-      {adjustOpen && null}
-      {reconcileOpen && null}
+      <AdjustBalanceDialog open={adjustOpen} onOpenChange={setAdjustOpen} account={account} />
+      <ReconcileDialog open={reconcileOpen} onOpenChange={setReconcileOpen} account={account} />
     </section>
   );
 }

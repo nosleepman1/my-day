@@ -225,20 +225,14 @@ function initialFormState(type: 'INCOME' | 'EXPENSE'): FormState {
   };
 }
 
-export function TransactionFormPage(): JSX.Element {
+function useTransactionFormSubmit(
+  form: FormState,
+  currency: CurrencyCode,
+  online: boolean,
+  idempotencyKey: string,
+) {
   const { t } = useTranslation('finance');
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const online = useOnlineStatus();
-  const [idempotencyKey] = useState(uuidv7);
-
-  const initialType = params.get('type') === 'INCOME' ? 'INCOME' : 'EXPENSE';
-  const [form, setForm] = useState<FormState>(() => initialFormState(initialType));
-
-  const accounts = useFinanceAccounts({ archived: false }).data?.data ?? [];
-  const selectedAccount = accounts.find((a) => a.id === form.accountId);
-  const currency = safeCurrency(selectedAccount?.currency);
-
   const mutation = useFinanceMutation(
     (input: CreateTransactionInput) => financeApi.createTransaction(input, idempotencyKey),
     { successMessage: t('transactionForm.createdSuccess') },
@@ -254,6 +248,29 @@ export function TransactionFormPage(): JSX.Element {
   };
 
   const isInvalid = !online || !form.accountId || form.amount.trim() === '' || form.amount === '0';
+
+  return { mutation, handleSubmit, isInvalid };
+}
+
+export function TransactionFormPage(): JSX.Element {
+  const { t } = useTranslation('finance');
+  const [params] = useSearchParams();
+  const online = useOnlineStatus();
+  const [idempotencyKey] = useState(uuidv7);
+
+  const initialType = params.get('type') === 'INCOME' ? 'INCOME' : 'EXPENSE';
+  const [form, setForm] = useState<FormState>(() => initialFormState(initialType));
+
+  const accounts = useFinanceAccounts({ archived: false }).data?.data ?? [];
+  const selectedAccount = accounts.find((a) => a.id === form.accountId);
+  const currency = safeCurrency(selectedAccount?.currency);
+
+  const { mutation, handleSubmit, isInvalid } = useTransactionFormSubmit(
+    form,
+    currency,
+    online,
+    idempotencyKey,
+  );
 
   return (
     <main className="flex flex-col gap-6 p-4 sm:p-6 max-w-2xl">

@@ -12,6 +12,8 @@ import { useTheme } from '@/app/theme';
 import {
   AccountDetailPage,
   AccountsPage,
+  CategoriesPage,
+  CounterpartiesPage,
   FinanceOverviewPage,
   HomePage,
   IdeaDetailPage,
@@ -24,6 +26,7 @@ import {
   ProfilePage,
   ProjectDetailPage,
   ProjectsPage,
+  ReportsPage,
   SecurityPage,
   SettingsLayout,
   Suspended,
@@ -62,6 +65,9 @@ const financeRoutes: RouteObject[] = [
         path: 'transfers',
         children: [{ path: 'new', element: <TransferFormPage /> }],
       },
+      { path: 'categories', element: <CategoriesPage /> },
+      { path: 'counterparties', element: <CounterpartiesPage /> },
+      { path: 'reports', element: <ReportsPage /> },
     ],
   },
 ];

@@ -26,7 +26,7 @@ type FiltersState = Readonly<{
   accountId: string;
 }>;
 
-function TransactionFilters({
+function TypeAndStatusFilterSelects({
   filters,
   onChange,
 }: Readonly<{
@@ -34,10 +34,8 @@ function TransactionFilters({
   onChange: (patch: Partial<FiltersState>) => void;
 }>): JSX.Element {
   const { t } = useTranslation('finance');
-  const accounts = useFinanceAccounts().data?.data ?? [];
-
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <>
       <NativeSelect
         id="filter-type"
         aria-label={t('transactions.type')}
@@ -65,6 +63,23 @@ function TransactionFilters({
           })),
         ]}
       />
+    </>
+  );
+}
+
+function TransactionFilters({
+  filters,
+  onChange,
+}: Readonly<{
+  filters: FiltersState;
+  onChange: (patch: Partial<FiltersState>) => void;
+}>): JSX.Element {
+  const { t } = useTranslation('finance');
+  const accounts = useFinanceAccounts().data?.data ?? [];
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <TypeAndStatusFilterSelects filters={filters} onChange={onChange} />
       <NativeSelect
         id="filter-account"
         aria-label={t('transactions.account')}

@@ -161,7 +161,7 @@ describe('shell and navigation', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Capture rapide')).toBeInTheDocument();
     await user.click(within(dialog).getByRole('radio', { name: 'Dépense' }));
-    expect(within(dialog).getByRole('status')).toHaveTextContent('phase 05');
+    expect(within(dialog).getByRole('button', { name: 'Capturer' })).toBeInTheDocument();
   });
 
   it('opens quick capture from the + button on mobile', async () => {

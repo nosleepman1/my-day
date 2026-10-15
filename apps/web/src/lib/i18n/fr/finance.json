@@ -213,6 +213,8 @@
     "name": "Nom",
     "namePlaceholder": "Ex. Auchan, Senelec, Employeur...",
     "defaultCategory": "Catégorie par défaut",
+    "person": "Particulier",
+    "organization": "Organisation",
     "createdSuccess": "Contrepartie créée."
   },
   "offlineWarning": "Hors ligne : saisie financière indisponible."
