@@ -122,6 +122,17 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   preferences             UserPreference?
+  ideas                   Idea[]
+  projects                Project[]
+  tasks                   Task[]
+  taskDependencies        TaskDependency[]
+  tags                    Tag[]
+  ideaTags                IdeaTag[]
+  taskTags                TaskTag[]
+  projectTags             ProjectTag[]
+  noteTags                NoteTag[]
+  notes                   Note[]
+  noteLinks               NoteLink[]
 
   @@index([status, createdAt], map: "ix_users__status_created")
   @@map("users")
@@ -232,4 +243,340 @@ model AuditLog {
   @@index([userId, occurredAt(sort: Desc)], map: "ix_audit_logs__user_time")
   @@index([userId, entityType, entityId, occurredAt(sort: Desc)], map: "ix_audit_logs__entity")
   @@map("audit_logs")
+}
+
+// ============================================================================
+// M03 - Organisation : idees, projets, taches, tags, notes (PHASE-04, DATA_MODEL.md M03)
+// Toutes les relations entre tables metier sont des FK composites (user_id, x_id) (ADR-007).
+// Les FK « SET NULL (colonne) » sont reecrites en SQL manuel (DATA_MODEL.md §1.4, §2.2).
+// ============================================================================
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@map("priority_level")
+}
+
+enum CaptureSource {
+  MANUAL
+  QUICK_CAPTURE
+  EMAIL
+  WHATSAPP
+  VOICE
+  IMPORT
+  AI
+  AUTOMATION
+  RECURRENCE
+
+  @@map("capture_source")
+}
+
+enum IdeaStatus {
+  INBOX
+  TO_REVIEW
+  EVALUATED
+  SELECTED
+  IN_PROGRESS
+  REALIZED
+  ABANDONED
+
+  @@map("idea_status")
+}
+
+enum ProjectType {
+  FREELANCE
+  PERSONAL_PRODUCT
+  LEARNING
+  INTERNAL
+
+  @@map("project_type")
+}
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ABANDONED
+
+  @@map("project_status")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELLED
+
+  @@map("task_status")
+}
+
+enum NoteKind {
+  NOTE
+  MEETING
+  REFERENCE
+  CHECKLIST
+  LOG
+
+  @@map("note_kind")
+}
+
+enum ContentFormat {
+  MARKDOWN
+  PLAIN
+
+  @@map("content_format")
+}
+
+model Idea {
+  id                 String         @id @db.Uuid
+  userId             String         @map("user_id") @db.Uuid
+  title              String         @db.VarChar(200)
+  description        String?
+  status             IdeaStatus     @default(INBOX)
+  priority           PriorityLevel?
+  domain             String?        @db.VarChar(60)
+  potentialScore     Int?           @map("potential_score") @db.SmallInt
+  capturedAt         DateTime       @default(now()) @map("captured_at") @db.Timestamptz(6)
+  source             CaptureSource  @default(MANUAL)
+  sourceRef          String?        @map("source_ref") @db.VarChar(255)
+  clientCaptureId    String?        @map("client_capture_id") @db.Uuid
+  convertedProjectId String?        @map("converted_project_id") @db.Uuid
+  decisionNote       String?        @map("decision_note")
+  version            Int            @default(1)
+  archivedAt         DateTime?      @map("archived_at") @db.Timestamptz(6)
+  deletedAt          DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user             User       @relation(fields: [userId], references: [id], onDelete: NoAction)
+  convertedProject Project?   @relation("IdeaConvertedProject", fields: [userId, convertedProjectId], references: [userId, id], onDelete: NoAction)
+  tags             IdeaTag[]
+  tasks            Task[]
+  noteLinks        NoteLink[]
+
+  @@unique([userId, id])
+  @@map("ideas")
+}
+
+model Project {
+  id          String         @id @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  name        String         @db.VarChar(120)
+  slug        String         @db.Citext
+  description String?
+  type        ProjectType    @default(PERSONAL_PRODUCT)
+  status      ProjectStatus  @default(PLANNED)
+  priority    PriorityLevel?
+  startsOn    DateTime?      @map("starts_on") @db.Date
+  targetOn    DateTime?      @map("target_on") @db.Date
+  completedOn DateTime?      @map("completed_on") @db.Date
+  color       String?        @db.VarChar(7)
+  version     Int            @default(1)
+  archivedAt  DateTime?      @map("archived_at") @db.Timestamptz(6)
+  deletedAt   DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: NoAction)
+  sourceIdeas Idea[]       @relation("IdeaConvertedProject")
+  tasks       Task[]
+  tags        ProjectTag[]
+  noteLinks   NoteLink[]
+
+  @@unique([userId, id])
+  @@map("projects")
+}
+
+model Task {
+  id                  String         @id @db.Uuid
+  userId              String         @map("user_id") @db.Uuid
+  title               String         @db.VarChar(300)
+  description         String?
+  status              TaskStatus     @default(TODO)
+  priority            PriorityLevel?
+  projectId           String?        @map("project_id") @db.Uuid
+  ideaId              String?        @map("idea_id") @db.Uuid
+  parentTaskId        String?        @map("parent_task_id") @db.Uuid
+  startsOn            DateTime?      @map("starts_on") @db.Date
+  dueDate             DateTime?      @map("due_date") @db.Date
+  dueAt               DateTime?      @map("due_at") @db.Timestamptz(6)
+  completedAt         DateTime?      @map("completed_at") @db.Timestamptz(6)
+  estimatedMinutes    Int?           @map("estimated_minutes")
+  actualMinutes       Int?           @map("actual_minutes")
+  recurrenceRule      String?        @map("recurrence_rule") @db.VarChar(500)
+  recurrenceAnchorOn  DateTime?      @map("recurrence_anchor_on") @db.Date
+  recurrenceLocalTime DateTime?      @map("recurrence_local_time") @db.Time(6)
+  recurrenceTimezone  String?        @map("recurrence_timezone") @db.VarChar(64)
+  nextOccurrenceAt    DateTime?      @map("next_occurrence_at") @db.Timestamptz(6)
+  recurrenceSeriesId  String?        @map("recurrence_series_id") @db.Uuid
+  occurrenceDate      DateTime?      @map("occurrence_date") @db.Date
+  source              CaptureSource  @default(MANUAL)
+  sourceRef           String?        @map("source_ref") @db.VarChar(255)
+  clientCaptureId     String?        @map("client_capture_id") @db.Uuid
+  kanbanRank          String?        @map("kanban_rank") @db.VarChar(64)
+  version             Int            @default(1)
+  deletedAt           DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: NoAction)
+  project      Project?         @relation(fields: [userId, projectId], references: [userId, id], onDelete: NoAction)
+  idea         Idea?            @relation(fields: [userId, ideaId], references: [userId, id], onDelete: NoAction)
+  parent       Task?            @relation("TaskSubtasks", fields: [userId, parentTaskId], references: [userId, id], onDelete: Cascade)
+  subtasks     Task[]           @relation("TaskSubtasks")
+  series       Task?            @relation("TaskOccurrences", fields: [userId, recurrenceSeriesId], references: [userId, id], onDelete: Cascade)
+  occurrences  Task[]           @relation("TaskOccurrences")
+  dependencies TaskDependency[] @relation("DependencyBlocked")
+  dependents   TaskDependency[] @relation("DependencyBlocking")
+  tags         TaskTag[]
+  noteLinks    NoteLink[]
+
+  @@unique([userId, id])
+  @@map("tasks")
+}
+
+/// « task_id dépend de depends_on_task_id » ; l'absence de cycle est garantie par un déclencheur.
+model TaskDependency {
+  userId          String   @map("user_id") @db.Uuid
+  taskId          String   @map("task_id") @db.Uuid
+  dependsOnTaskId String   @map("depends_on_task_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User @relation(fields: [userId], references: [id], onDelete: NoAction)
+  task      Task @relation("DependencyBlocked", fields: [userId, taskId], references: [userId, id], onDelete: Cascade)
+  dependsOn Task @relation("DependencyBlocking", fields: [userId, dependsOnTaskId], references: [userId, id], onDelete: Cascade)
+
+  @@id([userId, taskId, dependsOnTaskId])
+  @@index([userId, dependsOnTaskId], map: "ix_task_dependencies__depends_on")
+  @@map("task_dependencies")
+}
+
+model Tag {
+  id        String   @id @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String   @db.Citext
+  color     String?  @db.VarChar(7)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: NoAction)
+  ideas    IdeaTag[]
+  tasks    TaskTag[]
+  projects ProjectTag[]
+  notes    NoteTag[]
+
+  @@unique([userId, id])
+  @@unique([userId, name])
+  @@map("tags")
+}
+
+model IdeaTag {
+  userId    String   @map("user_id") @db.Uuid
+  ideaId    String   @map("idea_id") @db.Uuid
+  tagId     String   @map("tag_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction)
+  idea Idea @relation(fields: [userId, ideaId], references: [userId, id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [userId, tagId], references: [userId, id], onDelete: Cascade)
+
+  @@id([userId, ideaId, tagId])
+  @@index([userId, tagId], map: "ix_idea_tags__tag")
+  @@map("idea_tags")
+}
+
+model TaskTag {
+  userId    String   @map("user_id") @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  tagId     String   @map("tag_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction)
+  task Task @relation(fields: [userId, taskId], references: [userId, id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [userId, tagId], references: [userId, id], onDelete: Cascade)
+
+  @@id([userId, taskId, tagId])
+  @@index([userId, tagId], map: "ix_task_tags__tag")
+  @@map("task_tags")
+}
+
+model ProjectTag {
+  userId    String   @map("user_id") @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  tagId     String   @map("tag_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: NoAction)
+  project Project @relation(fields: [userId, projectId], references: [userId, id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [userId, tagId], references: [userId, id], onDelete: Cascade)
+
+  @@id([userId, projectId, tagId])
+  @@index([userId, tagId], map: "ix_project_tags__tag")
+  @@map("project_tags")
+}
+
+model NoteTag {
+  userId    String   @map("user_id") @db.Uuid
+  noteId    String   @map("note_id") @db.Uuid
+  tagId     String   @map("tag_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction)
+  note Note @relation(fields: [userId, noteId], references: [userId, id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [userId, tagId], references: [userId, id], onDelete: Cascade)
+
+  @@id([userId, noteId, tagId])
+  @@index([userId, tagId], map: "ix_note_tags__tag")
+  @@map("note_tags")
+}
+
+model Note {
+  id              String        @id @db.Uuid
+  userId          String        @map("user_id") @db.Uuid
+  title           String?       @db.VarChar(200)
+  content         String        @default("")
+  contentFormat   ContentFormat @default(MARKDOWN) @map("content_format")
+  kind            NoteKind      @default(NOTE)
+  source          CaptureSource @default(MANUAL)
+  sourceRef       String?       @map("source_ref") @db.VarChar(255)
+  clientCaptureId String?       @map("client_capture_id") @db.Uuid
+  version         Int           @default(1)
+  pinnedAt        DateTime?     @map("pinned_at") @db.Timestamptz(6)
+  archivedAt      DateTime?     @map("archived_at") @db.Timestamptz(6)
+  deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: NoAction)
+  tags  NoteTag[]
+  links NoteLink[]
+
+  @@unique([userId, id])
+  @@map("notes")
+}
+
+/// Lien explicite d'une note vers UNE cible (ADR-018) ; cibles ajoutées par les phases suivantes.
+model NoteLink {
+  id        String   @id @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  noteId    String   @map("note_id") @db.Uuid
+  ideaId    String?  @map("idea_id") @db.Uuid
+  projectId String?  @map("project_id") @db.Uuid
+  taskId    String?  @map("task_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: NoAction)
+  note    Note     @relation(fields: [userId, noteId], references: [userId, id], onDelete: Cascade)
+  idea    Idea?    @relation(fields: [userId, ideaId], references: [userId, id], onDelete: Cascade)
+  project Project? @relation(fields: [userId, projectId], references: [userId, id], onDelete: Cascade)
+  task    Task?    @relation(fields: [userId, taskId], references: [userId, id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId, noteId], map: "ix_note_links__note")
+  @@map("note_links")
 }

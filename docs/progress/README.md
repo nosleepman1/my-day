@@ -4,4 +4,4 @@ Ce dossier reçoit un fichier `PHASE-XX-REPORT.md` à la fin de chaque phase, r�
 
 C'est la **mémoire de travail** du projet. Toute nouvelle session commence par lire le dernier rapport.
 
-Dernier rapport : PHASE-00-REPORT.md. Prochaine phase : PHASE-01.
+Dernier rapport : PHASE-04-REPORT.md (organisation livrée côté code, recette mobile à faire). PHASE-03 : mise en ligne en attente du propriétaire (PHASE-03-REPORT.md).

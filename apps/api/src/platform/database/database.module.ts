@@ -3,6 +3,7 @@ import { Global, Module } from '@nestjs/common';
 import { TenantContext } from '../tenant/tenant-context';
 
 import { PrismaService } from './prisma.service';
+import { IdeaSimilarityQueries } from './raw/idea-similarity.queries';
 import { createScopedPrisma, TENANT_PRISMA } from './scoped-prisma';
 
 /**
@@ -14,7 +15,8 @@ import { createScopedPrisma, TENANT_PRISMA } from './scoped-prisma';
   providers: [
     PrismaService,
     { provide: TENANT_PRISMA, inject: [PrismaService, TenantContext], useFactory: createScopedPrisma },
+    IdeaSimilarityQueries,
   ],
-  exports: [PrismaService, TENANT_PRISMA],
+  exports: [PrismaService, TENANT_PRISMA, IdeaSimilarityQueries],
 })
 export class DatabaseModule {}

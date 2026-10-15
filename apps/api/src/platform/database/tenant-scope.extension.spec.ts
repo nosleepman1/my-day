@@ -71,8 +71,21 @@ describe('scopeArgs (ADR-007-3)', () => {
     ['findUnique', 'findUnique', { where: { id: 'x' } }],
     ['findUniqueOrThrow', 'findUniqueOrThrow', { where: { id: 'x' } }],
     ['an unknown operation', 'aggregateRaw', {}],
+    ['a nested connect on create', 'create', { data: { tags: { connect: [{ id: 'x' }] } } }],
+    ['a nested create on update', 'update', { where: { id: 'x' }, data: { notes: { create: { id: 'n' } } } }],
+    ['a nested createMany in createMany', 'createMany', { data: [{ tags: { createMany: { data: [] } } }] }],
+    [
+      'a nested write in upsert',
+      'upsert',
+      { where: { id: 'x' }, create: {}, update: { tags: { deleteMany: {} } } },
+    ],
   ])('refuses %s', (_label, operation, args) => {
     expect(() => scopeArgs(operation, args, USER)).toThrow(TenantScopeViolationError);
+  });
+
+  it('accepts scalar update operators and dates', () => {
+    const data = { version: { increment: 1 }, deletedAt: new Date(0), modules: { set: ['ideas'] } };
+    expect(() => scopeArgs('updateMany', { where: {}, data }, USER)).not.toThrow();
   });
 
   it('never mutates the arguments it receives', () => {
