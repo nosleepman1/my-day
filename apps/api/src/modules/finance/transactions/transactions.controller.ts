@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Headers,
   HttpCode,
@@ -96,11 +95,5 @@ export class TransactionsController {
   ): Promise<TransactionEnvelope> {
     const data = await this.transactions.cancel(this.tenant.requireUserId(), params.id, body);
     return { data };
-  }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param() params: IdParamDto): Promise<void> {
-    await this.transactions.delete(this.tenant.requireUserId(), params.id);
   }
 }

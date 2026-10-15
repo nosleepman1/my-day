@@ -125,6 +125,7 @@ describe('IdempotencyInterceptor', () => {
     const result = await lastValueFrom(stream$);
 
     expect(mockResponse.setHeader).toHaveBeenCalledWith('Idempotent-Replayed', 'true');
+    expect(mockResponse.setHeader).toHaveBeenCalledWith('Idempotency-Replayed', 'true');
     expect(mockResponse.status).toHaveBeenCalledWith(201);
     expect(result).toEqual({ data: { id: 'tx-1-cached' } });
     expect(mockHandler.handle).not.toHaveBeenCalled();

@@ -28,7 +28,6 @@ describe('TransactionsService', () => {
     updateDetails: ReturnType<typeof vi.fn>;
     validate: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
-    deletePending: ReturnType<typeof vi.fn>;
   };
   let mockCategoriesRepo: {
     findById: ReturnType<typeof vi.fn>;
@@ -132,7 +131,6 @@ describe('TransactionsService', () => {
         status: 'CANCELLED',
         cancelReason: 'Motif',
       }),
-      deletePending: vi.fn().mockResolvedValue(undefined),
     };
 
     mockCategoriesRepo = {
@@ -340,19 +338,6 @@ describe('TransactionsService', () => {
       expect(mockAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'finance.transaction.validate',
-          userId: USER_1,
-        }),
-      );
-    });
-  });
-
-  describe('delete', () => {
-    it('deletes a pending transaction and records audit', async () => {
-      await service.delete(USER_1, TX_1);
-      expect(mockRepo.deletePending).toHaveBeenCalledWith(USER_1, TX_1);
-      expect(mockAudit.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'finance.transaction.delete',
           userId: USER_1,
         }),
       );

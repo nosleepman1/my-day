@@ -16,6 +16,18 @@ function extractIdempotencyKey(req: Request): string | undefined {
   return Array.isArray(rawKey) ? rawKey[0] : rawKey;
 }
 
+function extractScope(req: Request, options: IdempotentOptions): string {
+  const routePath = (req.route as { path?: string } | undefined)?.path;
+  return options.scope ?? `${req.method} ${routePath ?? req.path}`;
+}
+
+function replayResponse(res: Response, status: number, body: unknown): Observable<unknown> {
+  res.setHeader('Idempotent-Replayed', 'true');
+  res.setHeader('Idempotency-Replayed', 'true');
+  res.status(status);
+  return of(body);
+}
+
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {
   constructor(
@@ -51,15 +63,12 @@ export class IdempotencyInterceptor implements NestInterceptor {
     }
 
     const userId = this.tenant.requireUserId();
-    const routePath = (req.route as { path?: string } | undefined)?.path;
-    const scope = options.scope ?? `${req.method} ${routePath ?? req.path}`;
+    const scope = extractScope(req, options);
     const requestHash = canonicalJsonHash(req.body);
 
     const started = await this.idempotency.start({ userId, scope, key, requestHash });
     if (started.status === 'REPLAYED') {
-      res.setHeader('Idempotent-Replayed', 'true');
-      res.status(started.responseStatus);
-      return of(started.responseBody);
+      return replayResponse(res, started.responseStatus, started.responseBody);
     }
 
     return next.handle().pipe(

@@ -156,31 +156,10 @@ export class TransactionsRepository {
     }
   }
 
-  private async insertRecords(
+  private async insertEntries(
     tx: Prisma.TransactionClient,
     params: CreateTransactionDbParams,
-  ): Promise<TransactionWithEntries> {
-    const transaction = await tx.transaction.create({
-      data: {
-        id: params.id,
-        userId: params.userId,
-        type: params.type,
-        status: params.status,
-        economicClass: params.economicClass,
-        amountMinor: params.amountMinor,
-        currency: params.currency,
-        occurredAt: params.occurredAt,
-        valueDate: params.valueDate,
-        description: params.description ?? null,
-        notes: params.notes ?? null,
-        categoryId: params.categoryId ?? null,
-        counterpartyId: params.counterpartyId ?? null,
-        source: params.source ?? 'MANUAL',
-        idempotencyKey: params.idempotencyKey ?? null,
-        validatedAt: params.status === 'VALIDATED' ? params.occurredAt : null,
-      },
-    });
-
+  ): Promise<LedgerEntry[]> {
     const entries: LedgerEntry[] = [];
     for (const entry of params.ledgerEntries) {
       const le = await tx.ledgerEntry.create({
@@ -195,6 +174,47 @@ export class TransactionsRepository {
         },
       });
       entries.push(le);
+    }
+    return entries;
+  }
+
+  private async insertRecords(
+    tx: Prisma.TransactionClient,
+    params: CreateTransactionDbParams,
+  ): Promise<TransactionWithEntries> {
+    const isDirectlyValidated = params.status === 'VALIDATED';
+    const transaction = await tx.transaction.create({
+      data: {
+        id: params.id,
+        userId: params.userId,
+        type: params.type,
+        status: 'PENDING',
+        economicClass: params.economicClass,
+        amountMinor: params.amountMinor,
+        currency: params.currency,
+        occurredAt: params.occurredAt,
+        valueDate: params.valueDate,
+        description: params.description ?? null,
+        notes: params.notes ?? null,
+        categoryId: params.categoryId ?? null,
+        counterpartyId: params.counterpartyId ?? null,
+        source: params.source ?? 'MANUAL',
+        idempotencyKey: params.idempotencyKey ?? null,
+        validatedAt: null,
+      },
+    });
+
+    const entries = await this.insertEntries(tx, params);
+
+    if (isDirectlyValidated) {
+      const updated = await tx.transaction.update({
+        where: { userId_id: { userId: params.userId, id: params.id } },
+        data: {
+          status: 'VALIDATED',
+          validatedAt: params.occurredAt,
+        },
+      });
+      return { ...updated, ledgerEntries: entries };
     }
 
     return { ...transaction, ledgerEntries: entries };
@@ -371,33 +391,6 @@ export class TransactionsRepository {
           validatedAt: this.ctx.now(),
         },
         include: { ledgerEntries: true },
-      });
-    });
-  }
-
-  async deletePending(userId: string, id: string): Promise<void> {
-    return this.ctx.db.$transaction(async (tx) => {
-      const txRecord = await tx.transaction.findFirst({
-        where: { userId, id },
-      });
-
-      if (!txRecord) {
-        throw new DomainError('NOT_FOUND', 'Transaction introuvable.');
-      }
-
-      if (txRecord.status !== 'PENDING') {
-        throw new DomainError(
-          'BUSINESS_RULE_VIOLATION',
-          'Seule une transaction en attente (PENDING) peut être supprimée.',
-        );
-      }
-
-      await tx.ledgerEntry.deleteMany({
-        where: { userId, transactionId: id },
-      });
-
-      await tx.transaction.delete({
-        where: { userId_id: { userId, id } },
       });
     });
   }

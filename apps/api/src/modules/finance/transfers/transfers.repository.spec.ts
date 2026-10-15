@@ -38,6 +38,7 @@ describe('TransfersRepository', () => {
     };
     transaction: {
       create: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
     };
   };
@@ -83,8 +84,8 @@ describe('TransfersRepository', () => {
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   };
-
   beforeEach(() => {
+    const createdTxs = new Map<string, Transaction>();
     mockTx = {
       financialAccount: {
         findMany: vi.fn().mockResolvedValue([sampleFromAccount, sampleToAccount]),
@@ -97,11 +98,30 @@ describe('TransfersRepository', () => {
         })),
       },
       transaction: {
-        create: vi.fn().mockImplementation(({ data }: { data: Transaction }) => ({
-          ...data,
-          createdAt: new Date('2026-02-01T00:00:00.000Z'),
-          updatedAt: new Date('2026-02-01T00:00:00.000Z'),
-        })),
+        create: vi.fn().mockImplementation(({ data }: { data: Transaction }) => {
+          const row = {
+            ...data,
+            createdAt: new Date('2026-02-01T00:00:00.000Z'),
+            updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+          };
+          createdTxs.set(data.id, row);
+          return row;
+        }),
+        update: vi
+          .fn()
+          .mockImplementation(
+            ({ where, data }: { where?: { userId_id?: { id: string } }; data: Partial<Transaction> }) => {
+              const txId = where?.userId_id?.id ?? '';
+              const existing = createdTxs.get(txId);
+              const updated = {
+                ...existing,
+                ...data,
+                updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+              };
+              createdTxs.set(txId, updated as Transaction);
+              return updated;
+            },
+          ),
         findFirst: vi.fn(),
       },
     };

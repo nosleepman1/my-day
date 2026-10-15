@@ -108,6 +108,19 @@ describe('IdempotencyService', () => {
       ).rejects.toThrow(DomainError);
     });
 
+    it('throws IDEMPOTENCY_IN_PROGRESS on P2002 race condition during creation', async () => {
+      mockPrisma.idempotencyKey.create.mockRejectedValue({ code: 'P2002' });
+
+      await expect(
+        service.start({
+          userId: USER_1,
+          scope: SCOPE,
+          key: KEY_1,
+          requestHash: validHash,
+        }),
+      ).rejects.toThrow(DomainError);
+    });
+
     it('replays response when same request was already completed', async () => {
       mockPrisma.idempotencyKey.findFirst.mockResolvedValue({
         userId: USER_1,

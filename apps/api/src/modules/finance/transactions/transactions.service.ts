@@ -282,16 +282,4 @@ export class TransactionsService {
 
     return toTransactionResponse(cancelled);
   }
-
-  async delete(userId: string, id: string): Promise<void> {
-    await this.repo.deletePending(userId, id);
-
-    await this.audit.record({
-      action: 'finance.transaction.delete',
-      userId,
-      entityType: 'Transaction',
-      entityId: id,
-      outcome: 'SUCCESS',
-    });
-  }
 }

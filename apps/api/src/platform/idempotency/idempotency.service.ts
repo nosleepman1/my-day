@@ -102,17 +102,33 @@ export class IdempotencyService {
     const ttl = params.ttlSeconds ?? DEFAULT_EXPIRATION_DAYS * 86400;
     const expiresAt = new Date(now.getTime() + ttl * 1000);
 
-    await this.prisma.idempotencyKey.create({
-      data: {
-        id: this.ids.next(),
-        userId: params.userId,
-        scope: params.scope,
-        key: params.key,
-        requestHash: new Uint8Array(params.requestHash),
-        status: 'IN_PROGRESS',
-        expiresAt,
-      },
-    });
+    try {
+      await this.prisma.idempotencyKey.create({
+        data: {
+          id: this.ids.next(),
+          userId: params.userId,
+          scope: params.scope,
+          key: params.key,
+          requestHash: new Uint8Array(params.requestHash),
+          status: 'IN_PROGRESS',
+          expiresAt,
+        },
+      });
+    } catch (err: unknown) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'code' in err &&
+        (err as { code: string }).code === 'P2002'
+      ) {
+        throw new DomainError(
+          'IDEMPOTENCY_IN_PROGRESS',
+          'Une opération avec cette clé d’idempotence est déjà en cours.',
+          { retryAfter: 1 },
+        );
+      }
+      throw err;
+    }
 
     return { status: 'STARTED' };
   }

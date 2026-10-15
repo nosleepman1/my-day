@@ -342,10 +342,6 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
         body: () => ({ reason: 'Annulation cross-user' }),
       },
     ),
-    'DELETE /api/v1/finance/transactions/:id': atFinance(
-      'delete',
-      (f) => `/finance/transactions/${f.transaction}`,
-    ),
     'GET /api/v1/finance/transfers/:id': atFinance('get', (f) => `/finance/transfers/${f.transfer}`),
   };
 

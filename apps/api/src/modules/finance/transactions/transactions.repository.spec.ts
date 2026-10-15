@@ -44,7 +44,6 @@ describe('TransactionsRepository', () => {
       findMany: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
       updateMany: ReturnType<typeof vi.fn>;
-      delete: ReturnType<typeof vi.fn>;
     };
   };
 
@@ -70,6 +69,7 @@ describe('TransactionsRepository', () => {
   };
 
   beforeEach(() => {
+    const createdTxs = new Map<string, Transaction>();
     mockTx = {
       financialAccount: {
         findMany: vi.fn().mockResolvedValue([sampleAccount]),
@@ -83,21 +83,36 @@ describe('TransactionsRepository', () => {
         deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       transaction: {
-        create: vi.fn().mockImplementation(({ data }: { data: Transaction }) => ({
-          ...data,
-          createdAt: new Date('2026-02-01T00:00:00.000Z'),
-          updatedAt: new Date('2026-02-01T00:00:00.000Z'),
-        })),
+        create: vi.fn().mockImplementation(({ data }: { data: Transaction }) => {
+          const row = {
+            ...data,
+            createdAt: new Date('2026-02-01T00:00:00.000Z'),
+            updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+          };
+          createdTxs.set(data.id, row);
+          return row;
+        }),
         findFirst: vi.fn(),
         findMany: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockImplementation(({ data }: { data: Partial<Transaction> }) => ({
-          id: TX_1,
-          userId: USER_1,
-          ...data,
-          ledgerEntries: [],
-        })),
+        update: vi
+          .fn()
+          .mockImplementation(
+            ({ where, data }: { where?: { userId_id?: { id: string } }; data: Partial<Transaction> }) => {
+              const txId = where?.userId_id?.id ?? TX_1;
+              const existing = createdTxs.get(txId);
+              const updated = {
+                id: txId,
+                userId: USER_1,
+                ...existing,
+                ...data,
+                ledgerEntries: [],
+                updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+              };
+              createdTxs.set(txId, updated as unknown as Transaction);
+              return updated;
+            },
+          ),
         updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-        delete: vi.fn().mockResolvedValue({ id: TX_1 }),
       },
     };
 
@@ -408,34 +423,6 @@ describe('TransactionsRepository', () => {
       });
 
       await expect(repository.validate(USER_1, TX_1)).rejects.toThrow(DomainError);
-    });
-  });
-
-  describe('deletePending', () => {
-    it('deletes PENDING transaction and its ledger entries', async () => {
-      mockTx.transaction.findFirst.mockResolvedValue({
-        id: TX_1,
-        userId: USER_1,
-        status: 'PENDING',
-      });
-
-      await repository.deletePending(USER_1, TX_1);
-      expect(mockTx.ledgerEntry.deleteMany).toHaveBeenCalledWith({
-        where: { userId: USER_1, transactionId: TX_1 },
-      });
-      expect(mockTx.transaction.delete).toHaveBeenCalledWith({
-        where: { userId_id: { userId: USER_1, id: TX_1 } },
-      });
-    });
-
-    it('rejects deletion of VALIDATED transaction with BUSINESS_RULE_VIOLATION', async () => {
-      mockTx.transaction.findFirst.mockResolvedValue({
-        id: TX_1,
-        userId: USER_1,
-        status: 'VALIDATED',
-      });
-
-      await expect(repository.deletePending(USER_1, TX_1)).rejects.toThrow(DomainError);
     });
   });
 

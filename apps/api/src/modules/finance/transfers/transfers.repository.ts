@@ -125,7 +125,7 @@ export class TransfersRepository {
         id: params.fee.id,
         userId: params.userId,
         type: 'EXPENSE',
-        status: 'VALIDATED',
+        status: 'PENDING',
         economicClass: 'EXPENSE_FEE',
         amountMinor: params.fee.amountMinor,
         currency: params.fromCurrency,
@@ -135,7 +135,7 @@ export class TransfersRepository {
         categoryId: params.fee.categoryId ?? null,
         parentTransactionId: params.id,
         source: 'MANUAL',
-        validatedAt: params.occurredAt,
+        validatedAt: null,
       },
     });
 
@@ -151,7 +151,15 @@ export class TransfersRepository {
       },
     });
 
-    return { ...feeTx, ledgerEntries: [feeEntry] };
+    const updatedFeeTx = await tx.transaction.update({
+      where: { userId_id: { userId: params.userId, id: feeTx.id } },
+      data: {
+        status: 'VALIDATED',
+        validatedAt: params.occurredAt,
+      },
+    });
+
+    return { ...updatedFeeTx, ledgerEntries: [feeEntry] };
   }
 
   async createTransfer(params: CreateTransferDbParams): Promise<TransferWithDetails> {
@@ -175,12 +183,12 @@ export class TransfersRepository {
       await this.assertOverdraft(txClient, params.userId, fromAccount, totalDebit);
 
       const rateVal = params.exchangeRate ? new Prisma.Decimal(params.exchangeRate) : null;
-      const transferTx = await tx.transaction.create({
+      await tx.transaction.create({
         data: {
           id: params.id,
           userId: params.userId,
           type: 'TRANSFER',
-          status: 'VALIDATED',
+          status: 'PENDING',
           economicClass: 'INTERNAL_TRANSFER',
           amountMinor: params.fromAmountMinor,
           currency: params.fromCurrency,
@@ -193,14 +201,22 @@ export class TransfersRepository {
           rateSource: rateVal ? 'MANUAL' : null,
           source: 'MANUAL',
           idempotencyKey: params.idempotencyKey ?? null,
-          validatedAt: params.occurredAt,
+          validatedAt: null,
         },
       });
 
       const entries = await this.insertEntries(txClient, params);
       const feeTransaction = await this.insertFee(txClient, params);
 
-      return { ...transferTx, ledgerEntries: entries, feeTransaction };
+      const updatedTransfer = await tx.transaction.update({
+        where: { userId_id: { userId: params.userId, id: params.id } },
+        data: {
+          status: 'VALIDATED',
+          validatedAt: params.occurredAt,
+        },
+      });
+
+      return { ...updatedTransfer, ledgerEntries: entries, feeTransaction };
     });
   }
 

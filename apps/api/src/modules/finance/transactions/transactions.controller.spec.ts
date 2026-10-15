@@ -19,7 +19,6 @@ describe('TransactionsController', () => {
     updateDetails: ReturnType<typeof vi.fn>;
     validate: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
   };
   let mockTenant: {
     requireUserId: ReturnType<typeof vi.fn>;
@@ -55,7 +54,6 @@ describe('TransactionsController', () => {
       updateDetails: vi.fn().mockResolvedValue(sampleResponse),
       validate: vi.fn().mockResolvedValue(sampleResponse),
       cancel: vi.fn().mockResolvedValue(sampleResponse),
-      delete: vi.fn().mockResolvedValue(undefined),
     };
 
     mockTenant = {
@@ -114,10 +112,5 @@ describe('TransactionsController', () => {
     const result = await controller.cancel({ id: TX_1 }, body);
     expect(mockService.cancel).toHaveBeenCalledWith(USER_1, TX_1, body);
     expect(result).toEqual({ data: sampleResponse });
-  });
-
-  it('delete delegates to service with user_id and param id', async () => {
-    await controller.delete({ id: TX_1 });
-    expect(mockService.delete).toHaveBeenCalledWith(USER_1, TX_1);
   });
 });
