@@ -3,9 +3,7 @@ export type RegistrationMode = 'closed' | 'allowlist' | 'open';
 const MAX_DISPLAY_NAME_LENGTH = 80;
 
 /** SECURITY.md §3.4 : trim, NFC, minuscules (partie locale et domaine). Clé unique de `users.email`. */
-export function normalizeEmail(email: string): string {
-  return email.trim().normalize('NFC').toLowerCase();
-}
+export { normalizeEmail } from '@orbit/contracts';
 
 /** ADR-026 : `closed` refuse tout, `allowlist` n'accepte que les adresses listées, `open` accepte tout. */
 export function isRegistrationAllowed(

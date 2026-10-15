@@ -45,9 +45,9 @@ class FakeAccounts {
 class FakeTokens {
   readonly issued: ActiveTokenInput[] = [];
 
-  replaceActive(input: ActiveTokenInput): Promise<void> {
+  replaceActive(input: ActiveTokenInput): Promise<boolean> {
     this.issued.push(input);
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
 }
 
@@ -195,7 +195,7 @@ describe('RegistrationService', () => {
       expect(accounts.created).toHaveLength(0);
     });
 
-    it('turns a mail failure into SERVICE_UNAVAILABLE and logs it without the address', async () => {
+    it('keeps the uniform response when the mail fails, and logs it without the address', async () => {
       const failing = {
         send: vi.fn().mockRejectedValue(new MailDeliveryError('email-verification')),
       };
@@ -203,7 +203,8 @@ describe('RegistrationService', () => {
 
       await expect(
         registration.register({ email: 'aminata.diop@example.test', password: STRONG }),
-      ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+      ).resolves.toBeUndefined();
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ template: 'email-verification' }),
         'auth.mail_delivery_failed',

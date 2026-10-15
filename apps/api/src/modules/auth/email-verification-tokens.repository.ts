@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import { isUniqueViolation } from '../../platform/database/prisma-error.mapper';
 import { PrismaService } from '../../platform/database/prisma.service';
 import type { IdGeneratorPort } from '../../platform/ids/id-generator.port';
 import { ID_GENERATOR } from '../../platform/ids/ids.module';
@@ -25,7 +26,7 @@ export type StoredVerificationToken = Readonly<{
 }>;
 
 export interface VerificationTokenStore {
-  replaceActive(input: ActiveTokenInput): Promise<void>;
+  replaceActive(input: ActiveTokenInput): Promise<boolean>;
 }
 
 export interface ConsumableTokenStore {
@@ -55,24 +56,31 @@ export class EmailVerificationTokensRepository implements VerificationTokenStore
    * Un seul jeton actif par compte et par usage (index `ux_email_verification_tokens__active`) :
    * l'émission d'un nouveau jeton consomme le précédent, dans la même transaction.
    */
-  async replaceActive(input: ActiveTokenInput): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.emailVerificationToken.updateMany({
-        where: { userId: input.userId, purpose: input.purpose, consumedAt: null },
-        data: { consumedAt: input.now },
-      }),
-      this.prisma.emailVerificationToken.create({
-        data: {
-          id: this.ids.next(),
-          userId: input.userId,
-          purpose: input.purpose,
-          targetEmail: input.targetEmail,
-          tokenHash: new Uint8Array(input.tokenHash),
-          expiresAt: input.expiresAt,
-          createdAt: input.now,
-        },
-      }),
-    ]);
+  /** `false` si une demande concurrente a créé le jeton actif d'abord (index unique partiel) : rien n'est envoyé. */
+  async replaceActive(input: ActiveTokenInput): Promise<boolean> {
+    try {
+      await this.prisma.$transaction([
+        this.prisma.emailVerificationToken.updateMany({
+          where: { userId: input.userId, purpose: input.purpose, consumedAt: null },
+          data: { consumedAt: input.now },
+        }),
+        this.prisma.emailVerificationToken.create({
+          data: {
+            id: this.ids.next(),
+            userId: input.userId,
+            purpose: input.purpose,
+            targetEmail: input.targetEmail,
+            tokenHash: new Uint8Array(input.tokenHash),
+            expiresAt: input.expiresAt,
+            createdAt: input.now,
+          },
+        }),
+      ]);
+      return true;
+    } catch (error: unknown) {
+      if (isUniqueViolation(error)) return false;
+      throw error;
+    }
   }
 
   findByHash(tokenHash: Buffer): Promise<StoredVerificationToken | null> {

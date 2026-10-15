@@ -1,9 +1,11 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { ZodSerializerDto } from 'nestjs-zod';
 
 import type { LoginResponse } from '@orbit/contracts';
 
+import { Audited } from '../../platform/audit/audit.interceptor';
 import { Public } from '../../platform/auth/public.decorator';
 import { CurrentSession } from '../../platform/auth/session-context';
 import {
@@ -13,6 +15,8 @@ import {
 } from '../../platform/auth/session-cookie';
 import type { AuthenticatedSession } from '../../platform/auth/session-resolver.port';
 import { clientContextFrom } from '../../platform/http/client-context';
+import { AUTH_ROUTE_LIMITS } from '../../platform/http/rate-limit';
+import { toSessionUser } from '../users';
 
 import { LoginRequestDto, LoginResponseDto } from './dto/login.dto';
 import { LoginService } from './login.service';
@@ -24,6 +28,8 @@ export class SessionController {
 
   @Public()
   @Post('login')
+  @Audited('auth.login')
+  @Throttle(AUTH_ROUTE_LIMITS.login)
   @HttpCode(HttpStatus.OK)
   @ZodSerializerDto(LoginResponseDto)
   async login(
@@ -37,16 +43,11 @@ export class SessionController {
       readSessionToken(request.headers.cookie),
     );
     response.setHeader('Set-Cookie', serializeSessionCookie(result.token, result.maxAgeSeconds));
-    const { emailVerifiedAt, ...user } = result.user;
-    return {
-      data: {
-        user: { ...user, emailVerifiedAt: emailVerifiedAt?.toISOString() ?? null, mfaEnabled: false },
-        mfaRequired: false,
-      },
-    };
+    return { data: { user: toSessionUser(result.user), mfaRequired: false } };
   }
 
   @Post('logout')
+  @Audited('auth.logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(
     @CurrentSession() session: AuthenticatedSession,

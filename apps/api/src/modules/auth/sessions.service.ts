@@ -8,6 +8,7 @@ import { CLOCK, type ClockPort } from '../../platform/time/clock.port';
 
 import { AUTH_SETTINGS, type AuthSettings } from './auth-settings';
 import {
+  type ActiveSessionRow,
   type SessionRevokeReason,
   type SessionStore,
   SessionsRepository,
@@ -73,11 +74,40 @@ export class SessionsService implements SessionResolverPort {
     if (now.getTime() - session.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
       await this.store.touch(session.id, now, this.idleExpiry(now, session.absoluteExpiresAt));
     }
-    return { sessionId: session.id, userId: session.userId, role: session.userRole };
+    return {
+      sessionId: session.id,
+      userId: session.userId,
+      role: session.userRole,
+      reauthAt: session.reauthAt,
+    };
   }
 
   revoke(sessionId: string, reason: SessionRevokeReason): Promise<void> {
     return this.store.revoke(sessionId, reason, this.clock.now());
+  }
+
+  ownerOf(sessionId: string): Promise<string | null> {
+    return this.store.ownerOf(sessionId);
+  }
+
+  listActive(userId: string): Promise<ActiveSessionRow[]> {
+    return this.store.listActive(userId, this.clock.now());
+  }
+
+  revokeOwned(userId: string, sessionId: string, reason: SessionRevokeReason): Promise<boolean> {
+    return this.store.revokeOwned(userId, sessionId, reason, this.clock.now());
+  }
+
+  markReauthenticated(sessionId: string): Promise<void> {
+    return this.store.markReauthenticated(sessionId, this.clock.now());
+  }
+
+  revokeAllForUser(
+    userId: string,
+    reason: SessionRevokeReason,
+    exceptSessionId: string | null,
+  ): Promise<void> {
+    return this.store.revokeAllForUser(userId, reason, this.clock.now(), exceptSessionId);
   }
 
   /** Inactivité glissante, jamais au-delà de l'expiration absolue. */

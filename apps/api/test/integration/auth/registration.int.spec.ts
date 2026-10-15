@@ -11,6 +11,7 @@ import { PrismaService } from '../../../src/platform/database/prisma.service';
 import type { CapturingMailAdapter } from '../../../src/platform/mail/capturing-mail.adapter';
 import { MAIL } from '../../../src/platform/mail/mail.port';
 import { createTestApp } from '../../helpers/create-test-app';
+import { CSRF_HEADERS } from '../../helpers/csrf';
 
 const STRONG = 'thiéboudienne au poisson 2026';
 const ACCEPTED = { data: { status: 'accepted' } };
@@ -34,7 +35,8 @@ describe('POST /auth/register and /auth/email/verify/resend (open mode)', () => 
     await app.close();
   });
 
-  const register = (body: object) => request(app.getHttpServer()).post('/api/v1/auth/register').send(body);
+  const register = (body: object) =>
+    request(app.getHttpServer()).post('/api/v1/auth/register').set(CSRF_HEADERS).send(body);
 
   it('creates the user, default preferences and a verification token, then mails the link', async () => {
     const email = uniqueEmail();
@@ -92,9 +94,14 @@ describe('POST /auth/register and /auth/email/verify/resend (open mode)', () => 
     await register({ email, password: STRONG }).expect(202);
     const firstToken = mail.lastTokenFor(email);
 
-    await request(app.getHttpServer()).post('/api/v1/auth/email/verify/resend').send({ email }).expect(202);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/email/verify/resend')
+      .set(CSRF_HEADERS)
+      .send({ email })
+      .expect(202);
     const unknown = await request(app.getHttpServer())
       .post('/api/v1/auth/email/verify/resend')
+      .set(CSRF_HEADERS)
       .send({ email: uniqueEmail() })
       .expect(202);
 
@@ -126,6 +133,7 @@ describe('POST /auth/register (allowlist mode, the default)', () => {
 
     await request(app.getHttpServer())
       .post('/api/v1/auth/register')
+      .set(CSRF_HEADERS)
       .send({ email: outsider, password: STRONG })
       .expect(202);
 
@@ -135,6 +143,7 @@ describe('POST /auth/register (allowlist mode, the default)', () => {
   it('creates the account of an allowlisted address', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/auth/register')
+      .set(CSRF_HEADERS)
       .send({ email: listed, password: STRONG })
       .expect(202);
 

@@ -23,6 +23,25 @@ const SETTINGS: AuthSettings = {
 };
 
 class FakeSessions implements SessionStore {
+  ownerOf(): Promise<null> {
+    return Promise.resolve(null);
+  }
+
+  listActive(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  revokeOwned(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
+  markReauthenticated(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  revokeAllForUser(): Promise<void> {
+    return Promise.resolve();
+  }
   readonly created: NewSessionInput[] = [];
   readonly touched: { id: string; lastSeenAt: Date; idleExpiresAt: Date }[] = [];
   readonly revoked: { id: string; reason: SessionRevokeReason; at: Date }[] = [];
@@ -58,6 +77,7 @@ function stored(overrides: Partial<StoredSession> = {}): StoredSession {
     absoluteExpiresAt: new Date(NOW.getTime() + 10 * DAY),
     userStatus: 'ACTIVE',
     userRole: 'USER',
+    reauthAt: null,
     ...overrides,
   };
 }
@@ -112,6 +132,7 @@ describe('SessionsService', () => {
         sessionId: 'session-1',
         userId: 'user-1',
         role: 'USER',
+        reauthAt: null,
       });
       expect(store.touched).toHaveLength(0);
     });

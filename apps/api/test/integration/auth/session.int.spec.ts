@@ -10,6 +10,7 @@ import { PrismaService } from '../../../src/platform/database/prisma.service';
 import type { CapturingMailAdapter } from '../../../src/platform/mail/capturing-mail.adapter';
 import { MAIL } from '../../../src/platform/mail/mail.port';
 import { createTestApp } from '../../helpers/create-test-app';
+import { CSRF_HEADERS } from '../../helpers/csrf';
 
 const STRONG = 'thiéboudienne au poisson 2026';
 const COOKIE =
@@ -34,10 +35,15 @@ describe('login, session cookie, global guard and logout', () => {
 
   async function registeredUser(verified = true): Promise<string> {
     const email = `session-${randomUUID()}@example.test`;
-    await http().post('/api/v1/auth/register').send({ email, password: STRONG }).expect(202);
+    await http()
+      .post('/api/v1/auth/register')
+      .set(CSRF_HEADERS)
+      .send({ email, password: STRONG })
+      .expect(202);
     if (verified) {
       await http()
         .post('/api/v1/auth/email/verify')
+        .set(CSRF_HEADERS)
         .send({ token: mail.lastTokenFor(email) })
         .expect(200);
     }
@@ -52,7 +58,7 @@ describe('login, session cookie, global guard and logout', () => {
   }
 
   const login = (email: string, password = STRONG, cookie?: string) => {
-    const call = http().post('/api/v1/auth/login').set('User-Agent', 'Firefox/131.0');
+    const call = http().post('/api/v1/auth/login').set(CSRF_HEADERS).set('User-Agent', 'Firefox/131.0');
     return (cookie === undefined ? call : call.set('Cookie', cookie)).send({ email, password });
   };
 
@@ -111,12 +117,13 @@ describe('login, session cookie, global guard and logout', () => {
     expect((await login(email).expect(401)).body.error.code).toBe('INVALID_CREDENTIALS');
     await http()
       .post('/api/v1/auth/logout')
+      .set(CSRF_HEADERS)
       .set('Cookie', header.split(';')[0] ?? '')
       .expect(401);
   });
 
   it('protects private routes with the global guard and keeps public ones open', async () => {
-    const response = await http().post('/api/v1/auth/logout').expect(401);
+    const response = await http().post('/api/v1/auth/logout').set(CSRF_HEADERS).expect(401);
 
     expect(response.body.error.code).toBe('UNAUTHENTICATED');
     await http().get('/api/v1/health/live').expect(200);
@@ -127,7 +134,11 @@ describe('login, session cookie, global guard and logout', () => {
     const { header, token } = sessionCookie(await login(email).expect(200));
     const cookie = header.split(';')[0] ?? '';
 
-    const response = await http().post('/api/v1/auth/logout').set('Cookie', cookie).expect(204);
+    const response = await http()
+      .post('/api/v1/auth/logout')
+      .set(CSRF_HEADERS)
+      .set('Cookie', cookie)
+      .expect(204);
 
     expect(response.headers['set-cookie']).toEqual([
       '__Host-orbit_sid=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax',
@@ -137,7 +148,7 @@ describe('login, session cookie, global guard and logout', () => {
       where: { tokenHash: new Uint8Array(hashOpaqueToken(token)) },
     });
     expect(session.revokeReason).toBe('LOGOUT');
-    await http().post('/api/v1/auth/logout').set('Cookie', cookie).expect(401);
+    await http().post('/api/v1/auth/logout').set(CSRF_HEADERS).set('Cookie', cookie).expect(401);
   });
 
   it('rotates the token at login and revokes the session presented by the browser (anti-fixation)', async () => {
@@ -149,10 +160,12 @@ describe('login, session cookie, global guard and logout', () => {
     expect(second.token).not.toBe(first.token);
     await http()
       .post('/api/v1/auth/logout')
+      .set(CSRF_HEADERS)
       .set('Cookie', first.header.split(';')[0] ?? '')
       .expect(401);
     await http()
       .post('/api/v1/auth/logout')
+      .set(CSRF_HEADERS)
       .set('Cookie', second.header.split(';')[0] ?? '')
       .expect(204);
   });
@@ -167,6 +180,7 @@ describe('login, session cookie, global guard and logout', () => {
 
     await http()
       .post('/api/v1/auth/logout')
+      .set(CSRF_HEADERS)
       .set('Cookie', header.split(';')[0] ?? '')
       .expect(401);
   });
