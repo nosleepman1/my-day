@@ -1,0 +1,10 @@
+# Disque, swap et mémoire des conteneurs ; le ping de succès sert aussi de battement du VPS
+# (Healthchecks.io : alerte si aucun ping pendant 30 minutes, INFRASTRUCTURE.md §12.5).
+[Unit]
+Description=ORBIT disk, swap and container memory check
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/orbit/diskcheck.sh
+TimeoutStartSec=5min
