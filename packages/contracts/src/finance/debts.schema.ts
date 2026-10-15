@@ -162,6 +162,14 @@ export const RepaymentResponseSchema = z.object({
 });
 export type RepaymentResponse = z.infer<typeof RepaymentResponseSchema>;
 
+export const DebtRepaymentParamSchema = z
+  .object({
+    id: z.uuid(),
+    repaymentId: z.uuid(),
+  })
+  .strict();
+export type DebtRepaymentParam = z.infer<typeof DebtRepaymentParamSchema>;
+
 export const DebtSummaryByCurrencySchema = z.object({
   currency: CurrencyCodeSchema,
   totalPayableMinor: z.string(),

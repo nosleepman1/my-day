@@ -18,6 +18,9 @@ describe('DebtsController', () => {
     list: ReturnType<typeof vi.fn>;
     getById: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
+    createRepayment: ReturnType<typeof vi.fn>;
+    listRepayments: ReturnType<typeof vi.fn>;
+    deleteRepayment: ReturnType<typeof vi.fn>;
   };
   let mockTenant: {
     requireUserId: ReturnType<typeof vi.fn>;
@@ -53,6 +56,9 @@ describe('DebtsController', () => {
       list: vi.fn().mockResolvedValue({ items: [sampleDebtResponse], nextCursor: null }),
       getById: vi.fn().mockResolvedValue(sampleDebtResponse),
       update: vi.fn().mockResolvedValue(sampleDebtResponse),
+      createRepayment: vi.fn(),
+      listRepayments: vi.fn(),
+      deleteRepayment: vi.fn(),
     };
 
     mockTenant = {
@@ -113,5 +119,71 @@ describe('DebtsController', () => {
     expect(mockTenant.requireUserId).toHaveBeenCalled();
     expect(mockService.update).toHaveBeenCalledWith(USER_1, DEBT_1, updateInput);
     expect(result).toEqual({ data: sampleDebtResponse });
+  });
+
+  it('createRepayment delegates to service and returns data envelope', async () => {
+    const repaymentResponse = {
+      id: '01927000-0000-7000-8000-000000000050',
+      debtId: DEBT_1,
+      transactionId: '01927000-0000-7000-8000-000000000040',
+      amountMinor: '50000',
+      currency: 'XOF' as const,
+      notes: null,
+      createdAt: '2026-10-15T12:00:00.000Z',
+    };
+    mockService.createRepayment.mockResolvedValue(repaymentResponse);
+
+    const result = await controller.createRepayment(
+      { id: DEBT_1 },
+      { amountMinor: '50000', accountId: '01927000-0000-7000-8000-000000000030' },
+    );
+
+    expect(mockService.createRepayment).toHaveBeenCalledWith(USER_1, DEBT_1, {
+      amountMinor: '50000',
+      accountId: '01927000-0000-7000-8000-000000000030',
+    });
+    expect(result).toEqual({ data: repaymentResponse });
+  });
+
+  it('listRepayments delegates to service and returns list envelope', async () => {
+    const repayments = [
+      {
+        id: '01927000-0000-7000-8000-000000000050',
+        debtId: DEBT_1,
+        transactionId: '01927000-0000-7000-8000-000000000040',
+        amountMinor: '50000',
+        currency: 'XOF' as const,
+        notes: null,
+        createdAt: '2026-10-15T12:00:00.000Z',
+      },
+    ];
+    mockService.listRepayments.mockResolvedValue(repayments);
+
+    const result = await controller.listRepayments({ id: DEBT_1 });
+
+    expect(mockService.listRepayments).toHaveBeenCalledWith(USER_1, DEBT_1);
+    expect(result).toEqual({
+      data: repayments,
+      meta: {
+        limit: 1,
+        hasMore: false,
+        nextCursor: null,
+      },
+    });
+  });
+
+  it('deleteRepayment delegates to service with userId, debtId, repaymentId', async () => {
+    mockService.deleteRepayment.mockResolvedValue(undefined);
+
+    await controller.deleteRepayment({
+      id: DEBT_1,
+      repaymentId: '01927000-0000-7000-8000-000000000050',
+    });
+
+    expect(mockService.deleteRepayment).toHaveBeenCalledWith(
+      USER_1,
+      DEBT_1,
+      '01927000-0000-7000-8000-000000000050',
+    );
   });
 });

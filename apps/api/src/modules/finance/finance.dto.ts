@@ -27,6 +27,7 @@ import {
   CreateTransferSchema,
   DebtEnvelopeSchema,
   DebtListEnvelopeSchema,
+  DebtRepaymentParamSchema,
   DebtSummaryEnvelopeSchema,
   FinanceSummaryEnvelopeSchema,
   FinanceSummaryQuerySchema,
@@ -121,3 +122,4 @@ export class DebtSummaryEnvelopeDto extends createZodDto(DebtSummaryEnvelopeSche
 export class CreateRepaymentDto extends createZodDto(CreateRepaymentSchema) {}
 export class RepaymentEnvelopeDto extends createZodDto(RepaymentEnvelopeSchema) {}
 export class RepaymentListEnvelopeDto extends createZodDto(RepaymentListEnvelopeSchema) {}
+export class DebtRepaymentParamDto extends createZodDto(DebtRepaymentParamSchema) {}

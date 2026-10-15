@@ -3,6 +3,7 @@ import type { Debt, DebtStatus, DebtType, Prisma, TransactionStatus } from '@pri
 
 import { AccountLockingQueries } from '../../../platform/database/raw/account-locking.queries';
 import { DomainError } from '../../../platform/errors/domain-error';
+import { computeDebtRemaining } from '../domain/debt-rules';
 import { FinanceContext } from '../shared/finance-context';
 
 export interface DebtRepaymentWithStatus {
@@ -10,6 +11,46 @@ export interface DebtRepaymentWithStatus {
   readonly transaction: {
     readonly status: TransactionStatus;
   };
+}
+
+export interface RepaymentWithTransaction {
+  readonly id: string;
+  readonly debtId: string;
+  readonly transactionId: string;
+  readonly amountMinor: bigint;
+  readonly currency: string;
+  readonly notes: string | null;
+  readonly createdAt: Date;
+  readonly transaction: {
+    readonly id: string;
+    readonly occurredAt: Date;
+    readonly valueDate: Date;
+    readonly status: TransactionStatus;
+    readonly amountMinor: bigint;
+    readonly currency: string;
+  };
+}
+
+export interface CreateRepaymentWithTxParams {
+  readonly id: string;
+  readonly userId: string;
+  readonly debtId: string;
+  readonly accountId: string;
+  readonly amountMinor: bigint;
+  readonly date?: string;
+  readonly notes?: string | null;
+  readonly transactionId: string;
+  readonly ledgerEntryId: string;
+  readonly occurredAt: Date;
+}
+
+export interface AttachRepaymentParams {
+  readonly id: string;
+  readonly userId: string;
+  readonly debtId: string;
+  readonly transactionId: string;
+  readonly amountMinor: bigint;
+  readonly notes?: string | null;
 }
 
 export interface DebtWithRelations extends Debt {
@@ -311,6 +352,213 @@ export class DebtsRepository {
           select: {
             amountMinor: true,
             transaction: { select: { status: true } },
+          },
+        },
+      },
+    });
+  }
+
+  private validateDebtForRepayment(debt: DebtWithRelations | null, amountMinor: bigint): DebtWithRelations {
+    if (!debt) {
+      throw new DomainError('NOT_FOUND', 'Dette introuvable.');
+    }
+    if (debt.status !== 'OPEN') {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Impossible de rembourser une dette clôturée.');
+    }
+    const remaining = computeDebtRemaining(debt.principalMinor, debt.repayments);
+    if (amountMinor > remaining) {
+      throw new DomainError('OVERPAYMENT', 'Le montant du remboursement dépasse le solde restant.');
+    }
+    return debt;
+  }
+
+  private async executeRepaymentAccount(
+    tx: Prisma.TransactionClient,
+    debt: DebtWithRelations,
+    params: CreateRepaymentWithTxParams,
+    valueDate: Date,
+  ): Promise<void> {
+    await this.accountLocking.lockAccounts(tx, params.userId, [params.accountId]);
+    const account = await tx.financialAccount.findFirst({
+      where: { userId: params.userId, id: params.accountId },
+    });
+    if (!account) {
+      throw new DomainError('NOT_FOUND', 'Compte financier introuvable.');
+    }
+    this.validateInitialAccount(account, debt.currency, valueDate);
+
+    if (debt.type === 'PAYABLE') {
+      await this.assertOverdraftForEntry(tx, params.userId, account, params.amountMinor);
+    }
+
+    const txType = debt.type === 'PAYABLE' ? 'EXPENSE' : 'INCOME';
+    const economicClass = debt.type === 'PAYABLE' ? 'DEBT_REPAYMENT' : 'LOAN_COLLECTION';
+    const direction = debt.type === 'PAYABLE' ? 'DEBIT' : 'CREDIT';
+
+    await tx.transaction.create({
+      data: {
+        id: params.transactionId,
+        userId: params.userId,
+        type: txType,
+        status: 'VALIDATED',
+        economicClass,
+        amountMinor: params.amountMinor,
+        currency: debt.currency,
+        occurredAt: params.occurredAt,
+        valueDate,
+        description: `Remboursement: ${debt.title}`,
+        counterpartyId: debt.counterpartyId,
+        source: 'MANUAL',
+      },
+    });
+
+    await tx.ledgerEntry.create({
+      data: {
+        id: params.ledgerEntryId,
+        userId: params.userId,
+        transactionId: params.transactionId,
+        accountId: params.accountId,
+        direction,
+        amountMinor: params.amountMinor,
+        currency: debt.currency,
+      },
+    });
+  }
+
+  async createRepaymentWithTransaction(
+    params: CreateRepaymentWithTxParams,
+  ): Promise<RepaymentWithTransaction> {
+    return this.ctx.db.$transaction(async (tx) => {
+      const txClient = tx as unknown as Prisma.TransactionClient;
+      const debt = await this.findById(params.userId, params.debtId);
+      const safeDebt = this.validateDebtForRepayment(debt, params.amountMinor);
+
+      const valueDate = params.date ? new Date(params.date) : params.occurredAt;
+      await this.executeRepaymentAccount(txClient, safeDebt, params, valueDate);
+
+      return tx.debtRepayment.create({
+        data: {
+          id: params.id,
+          userId: params.userId,
+          debtId: params.debtId,
+          transactionId: params.transactionId,
+          amountMinor: params.amountMinor,
+          currency: safeDebt.currency,
+          notes: params.notes ?? null,
+        },
+        include: {
+          transaction: {
+            select: {
+              id: true,
+              occurredAt: true,
+              valueDate: true,
+              status: true,
+              amountMinor: true,
+              currency: true,
+            },
+          },
+        },
+      });
+    });
+  }
+
+  private validateExistingTxForRepayment(
+    existingTx: { status: string; currency: string; amountMinor: bigint } | null,
+    debtCurrency: string,
+    amountMinor: bigint,
+  ): void {
+    if (!existingTx) {
+      throw new DomainError('NOT_FOUND', 'Transaction introuvable.');
+    }
+    if (existingTx.status !== 'VALIDATED') {
+      throw new DomainError('BUSINESS_RULE_VIOLATION', 'Seule une transaction validée peut être rattachée.');
+    }
+    if (existingTx.currency !== debtCurrency) {
+      throw new DomainError('CURRENCY_MISMATCH', 'Devise de la transaction incompatible avec la dette.');
+    }
+    if (amountMinor > existingTx.amountMinor) {
+      throw new DomainError(
+        'BUSINESS_RULE_VIOLATION',
+        'Le montant imputé dépasse le montant de la transaction.',
+      );
+    }
+  }
+
+  async attachRepayment(params: AttachRepaymentParams): Promise<RepaymentWithTransaction> {
+    return this.ctx.db.$transaction(async (tx) => {
+      const debt = await this.findById(params.userId, params.debtId);
+      const safeDebt = this.validateDebtForRepayment(debt, params.amountMinor);
+
+      const existingTx = await tx.transaction.findFirst({
+        where: { userId: params.userId, id: params.transactionId },
+      });
+      this.validateExistingTxForRepayment(existingTx, safeDebt.currency, params.amountMinor);
+
+      const existingRepayment = await tx.debtRepayment.findFirst({
+        where: { userId: params.userId, transactionId: params.transactionId },
+      });
+      if (existingRepayment) {
+        throw new DomainError('CONFLICT', 'Cette transaction est déjà rattachée à un remboursement.');
+      }
+
+      return tx.debtRepayment.create({
+        data: {
+          id: params.id,
+          userId: params.userId,
+          debtId: params.debtId,
+          transactionId: params.transactionId,
+          amountMinor: params.amountMinor,
+          currency: safeDebt.currency,
+          notes: params.notes ?? null,
+        },
+        include: {
+          transaction: {
+            select: {
+              id: true,
+              occurredAt: true,
+              valueDate: true,
+              status: true,
+              amountMinor: true,
+              currency: true,
+            },
+          },
+        },
+      });
+    });
+  }
+
+  async deleteRepayment(
+    userId: string,
+    debtId: string,
+    repaymentId: string,
+  ): Promise<{ id: string; debtId: string; transactionId: string }> {
+    const repayment = await this.ctx.db.debtRepayment.findFirst({
+      where: { userId, debtId, id: repaymentId },
+    });
+    if (!repayment) {
+      throw new DomainError('NOT_FOUND', 'Remboursement introuvable.');
+    }
+
+    await this.ctx.db.debtRepayment.delete({
+      where: { userId_id: { userId, id: repaymentId } },
+    });
+
+    return { id: repayment.id, debtId: repayment.debtId, transactionId: repayment.transactionId };
+  }
+
+  async listRepayments(userId: string, debtId: string): Promise<RepaymentWithTransaction[]> {
+    return this.ctx.db.debtRepayment.findMany({
+      where: { userId, debtId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        transaction: {
+          select: {
+            id: true,
+            occurredAt: true,
+            valueDate: true,
+            status: true,
+            amountMinor: true,
+            currency: true,
           },
         },
       },

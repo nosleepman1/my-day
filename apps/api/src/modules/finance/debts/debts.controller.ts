@@ -1,16 +1,36 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ZodSerializerDto } from 'nestjs-zod';
 
-import type { DebtEnvelope, DebtListEnvelope } from '@orbit/contracts';
+import type {
+  DebtEnvelope,
+  DebtListEnvelope,
+  RepaymentEnvelope,
+  RepaymentListEnvelope,
+} from '@orbit/contracts';
 
 import { Idempotent } from '../../../platform/idempotency/idempotent.decorator';
 import { TenantContext } from '../../../platform/tenant/tenant-context';
 import {
   CreateDebtDto,
+  CreateRepaymentDto,
   DebtEnvelopeDto,
   DebtListEnvelopeDto,
+  DebtRepaymentParamDto,
   IdParamDto,
   ListDebtsQueryDto,
+  RepaymentEnvelopeDto,
+  RepaymentListEnvelopeDto,
   UpdateDebtDto,
 } from '../finance.dto';
 
@@ -58,5 +78,36 @@ export class DebtsController {
   async update(@Param() params: IdParamDto, @Body() body: UpdateDebtDto): Promise<DebtEnvelope> {
     const data = await this.debts.update(this.tenant.requireUserId(), params.id, body);
     return { data };
+  }
+
+  @Post(':id/repayments')
+  @Idempotent()
+  @ZodSerializerDto(RepaymentEnvelopeDto)
+  async createRepayment(
+    @Param() params: IdParamDto,
+    @Body() body: CreateRepaymentDto,
+  ): Promise<RepaymentEnvelope> {
+    const data = await this.debts.createRepayment(this.tenant.requireUserId(), params.id, body);
+    return { data };
+  }
+
+  @Get(':id/repayments')
+  @ZodSerializerDto(RepaymentListEnvelopeDto)
+  async listRepayments(@Param() params: IdParamDto): Promise<RepaymentListEnvelope> {
+    const items = await this.debts.listRepayments(this.tenant.requireUserId(), params.id);
+    return {
+      data: items,
+      meta: {
+        limit: items.length || 1,
+        hasMore: false,
+        nextCursor: null,
+      },
+    };
+  }
+
+  @Delete(':id/repayments/:repaymentId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteRepayment(@Param() params: DebtRepaymentParamDto): Promise<void> {
+    await this.debts.deleteRepayment(this.tenant.requireUserId(), params.id, params.repaymentId);
   }
 }

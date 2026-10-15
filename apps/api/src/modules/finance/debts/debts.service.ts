@@ -3,12 +3,15 @@ import { Injectable } from '@nestjs/common';
 import type {
   CreateDebt,
   CreateDebtInput,
+  CreateRepayment,
+  CreateRepaymentInput,
   CurrencyCode,
   DebtResponse,
   ListDebtsQuery,
+  RepaymentResponse,
   UpdateDebt,
 } from '@orbit/contracts';
-import { CreateDebtSchema, UpdateDebtSchema } from '@orbit/contracts';
+import { CreateDebtSchema, CreateRepaymentSchema, UpdateDebtSchema } from '@orbit/contracts';
 
 import { AuditService } from '../../../platform/audit/audit.service';
 import { DomainError } from '../../../platform/errors/domain-error';
@@ -16,8 +19,28 @@ import type { CounterpartiesRepository } from '../counterparties/counterparties.
 import { computeDebtRemaining, deriveSettlementStatus, isDebtOverdue } from '../domain/debt-rules';
 import { FinanceContext } from '../shared/finance-context';
 
-import type { CreateDebtDbParams, DebtWithRelations } from './debts.repository';
+import type { CreateDebtDbParams, DebtWithRelations, RepaymentWithTransaction } from './debts.repository';
 import { DebtsRepository } from './debts.repository';
+
+export function toRepaymentResponse(item: RepaymentWithTransaction): RepaymentResponse {
+  return {
+    id: item.id,
+    debtId: item.debtId,
+    transactionId: item.transactionId,
+    amountMinor: item.amountMinor.toString(),
+    currency: item.currency as CurrencyCode,
+    notes: item.notes,
+    createdAt: item.createdAt.toISOString(),
+    transaction: {
+      id: item.transaction.id,
+      occurredAt: item.transaction.occurredAt.toISOString(),
+      valueDate: item.transaction.valueDate.toISOString().slice(0, 10),
+      status: item.transaction.status,
+      amountMinor: item.transaction.amountMinor.toString(),
+      currency: item.transaction.currency as CurrencyCode,
+    },
+  };
+}
 
 export function toDebtResponse(debt: DebtWithRelations, todayCivil: string): DebtResponse {
   const repaymentsList = debt.repayments.map((r) => ({
@@ -208,5 +231,108 @@ export class DebtsService {
     });
 
     return toDebtResponse(updated, this.getTodayCivil());
+  }
+
+  private async executeRepaymentDispatch(
+    userId: string,
+    debtId: string,
+    input: CreateRepayment,
+  ): Promise<RepaymentWithTransaction> {
+    if (input.accountId) {
+      return this.repo.createRepaymentWithTransaction({
+        id: this.ctx.newId(),
+        userId,
+        debtId,
+        accountId: input.accountId,
+        amountMinor: BigInt(input.amountMinor),
+        date: input.date,
+        notes: input.notes,
+        transactionId: this.ctx.newId(),
+        ledgerEntryId: this.ctx.newId(),
+        occurredAt: this.ctx.now(),
+      });
+    }
+
+    if (!input.transactionId) {
+      throw new DomainError('BUSINESS_RULE_VIOLATION', 'Identifiant de transaction manquant.');
+    }
+
+    return this.repo.attachRepayment({
+      id: this.ctx.newId(),
+      userId,
+      debtId,
+      transactionId: input.transactionId,
+      amountMinor: BigInt(input.amountMinor),
+      notes: input.notes,
+    });
+  }
+
+  private assertDebtRepayable(debt: DebtWithRelations | null, amountMinor: bigint): void {
+    if (!debt) {
+      throw new DomainError('NOT_FOUND', 'Dette introuvable.');
+    }
+    if (debt.status !== 'OPEN') {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Impossible de rembourser une dette non ouverte.');
+    }
+    const remaining = computeDebtRemaining(debt.principalMinor, debt.repayments);
+    if (amountMinor > remaining) {
+      throw new DomainError('OVERPAYMENT', 'Le montant du remboursement dépasse le solde restant.');
+    }
+  }
+
+  async createRepayment(
+    userId: string,
+    debtId: string,
+    rawInput: CreateRepaymentInput,
+  ): Promise<RepaymentResponse> {
+    const input = CreateRepaymentSchema.parse(rawInput);
+    const debt = await this.repo.findById(userId, debtId);
+    this.assertDebtRepayable(debt, BigInt(input.amountMinor));
+
+    const repayment = await this.executeRepaymentDispatch(userId, debtId, input);
+
+    await this.audit.record({
+      action: 'finance.debt.repayment_create',
+      userId,
+      entityType: 'DebtRepayment',
+      entityId: repayment.id,
+      outcome: 'SUCCESS',
+      metadata: {
+        debtId,
+        amountMinor: repayment.amountMinor.toString(),
+        currency: repayment.currency,
+      },
+    });
+
+    return toRepaymentResponse(repayment);
+  }
+
+  async deleteRepayment(userId: string, debtId: string, repaymentId: string): Promise<void> {
+    const debt = await this.repo.findById(userId, debtId);
+    if (!debt) {
+      throw new DomainError('NOT_FOUND', 'Dette introuvable.');
+    }
+    const deleted = await this.repo.deleteRepayment(userId, debtId, repaymentId);
+
+    await this.audit.record({
+      action: 'finance.debt.repayment_delete',
+      userId,
+      entityType: 'DebtRepayment',
+      entityId: repaymentId,
+      outcome: 'SUCCESS',
+      metadata: {
+        debtId,
+        transactionId: deleted.transactionId,
+      },
+    });
+  }
+
+  async listRepayments(userId: string, debtId: string): Promise<RepaymentResponse[]> {
+    const debt = await this.repo.findById(userId, debtId);
+    if (!debt) {
+      throw new DomainError('NOT_FOUND', 'Dette introuvable.');
+    }
+    const items = await this.repo.listRepayments(userId, debtId);
+    return items.map(toRepaymentResponse);
   }
 }
