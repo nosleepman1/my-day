@@ -232,6 +232,55 @@ function buildPayload(form: FormState): CreateAccountInput {
   };
 }
 
+function AccountDialogFooter({
+  pending,
+  disabled,
+  onCancel,
+}: Readonly<{
+  pending: boolean;
+  disabled: boolean;
+  onCancel: () => void;
+}>): JSX.Element {
+  const { t } = useTranslation(['finance', 'common']);
+  return (
+    <DialogFooter>
+      <Button variant="secondary" type="button" onClick={onCancel}>
+        {t('common:actions.cancel')}
+      </Button>
+      <Button type="submit" disabled={disabled}>
+        {pending ? t('accountForm.saving') : t('accountForm.save')}
+      </Button>
+    </DialogFooter>
+  );
+}
+
+function AccountFormBody({
+  form,
+  onChange,
+}: Readonly<{
+  form: FormState;
+  onChange: (patch: Partial<FormState>) => void;
+}>): JSX.Element {
+  return (
+    <>
+      <AccountNameAndProvider state={form} onChange={onChange} />
+      <AccountTypeAndCurrency state={form} onChange={onChange} />
+      <AccountOpeningFields state={form} onChange={onChange} />
+      <OverdraftSection
+        allowOverdraft={form.allowOverdraft}
+        overdraftLimit={form.overdraftLimit}
+        currency={form.currency}
+        onToggle={(checked) => {
+          onChange({ allowOverdraft: checked });
+        }}
+        onLimitChange={(val: string) => {
+          onChange({ overdraftLimit: val });
+        }}
+      />
+    </>
+  );
+}
+
 export function AccountFormDialog({ open, onOpenChange }: AccountFormDialogProps): JSX.Element {
   const { t } = useTranslation(['finance', 'common']);
   const [form, setForm] = useState<FormState>(initialFormState);
@@ -256,49 +305,19 @@ export function AccountFormDialog({ open, onOpenChange }: AccountFormDialogProps
             <DialogTitle>{t('accountForm.titleCreate')}</DialogTitle>
             <DialogDescription>{t('accounts.subtitle')}</DialogDescription>
           </DialogHeader>
-          <AccountNameAndProvider
-            state={form}
+          <AccountFormBody
+            form={form}
             onChange={(p) => {
               setForm((c) => ({ ...c, ...p }));
             }}
           />
-          <AccountTypeAndCurrency
-            state={form}
-            onChange={(p) => {
-              setForm((c) => ({ ...c, ...p }));
+          <AccountDialogFooter
+            pending={createMutation.isPending}
+            disabled={createMutation.isPending || form.name.trim() === ''}
+            onCancel={() => {
+              onOpenChange(false);
             }}
           />
-          <AccountOpeningFields
-            state={form}
-            onChange={(p) => {
-              setForm((c) => ({ ...c, ...p }));
-            }}
-          />
-          <OverdraftSection
-            allowOverdraft={form.allowOverdraft}
-            overdraftLimit={form.overdraftLimit}
-            currency={form.currency}
-            onToggle={(checked) => {
-              setForm((c) => ({ ...c, allowOverdraft: checked }));
-            }}
-            onLimitChange={(val: string) => {
-              setForm((c) => ({ ...c, overdraftLimit: val }));
-            }}
-          />
-          <DialogFooter>
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => {
-                onOpenChange(false);
-              }}
-            >
-              {t('common:actions.cancel')}
-            </Button>
-            <Button type="submit" disabled={createMutation.isPending || form.name.trim() === ''}>
-              {createMutation.isPending ? t('accountForm.saving') : t('accountForm.save')}
-            </Button>
-          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

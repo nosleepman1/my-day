@@ -30,6 +30,10 @@ import {
   TagsPage,
   TaskDetailPage,
   TasksPage,
+  TransactionDetailPage,
+  TransactionFormPage,
+  TransactionsPage,
+  TransferFormPage,
 } from './lazy-pages';
 
 /** Finances (PHASE-05) : chaque écran est gardé par son module (`enabled_modules`, ADR-024). */
@@ -45,6 +49,18 @@ const financeRoutes: RouteObject[] = [
           { index: true, element: <AccountsPage /> },
           { path: ':id', element: <AccountDetailPage /> },
         ],
+      },
+      {
+        path: 'transactions',
+        children: [
+          { index: true, element: <TransactionsPage /> },
+          { path: 'new', element: <TransactionFormPage /> },
+          { path: ':id', element: <TransactionDetailPage /> },
+        ],
+      },
+      {
+        path: 'transfers',
+        children: [{ path: 'new', element: <TransferFormPage /> }],
       },
     ],
   },

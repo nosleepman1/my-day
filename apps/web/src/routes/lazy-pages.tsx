@@ -70,6 +70,18 @@ export const AccountsPage = lazy(() => finance().then((module) => ({ default: mo
 export const AccountDetailPage = lazy(() =>
   finance().then((module) => ({ default: module.AccountDetailPage })),
 );
+export const TransactionsPage = lazy(() =>
+  finance().then((module) => ({ default: module.TransactionsPage })),
+);
+export const TransactionDetailPage = lazy(() =>
+  finance().then((module) => ({ default: module.TransactionDetailPage })),
+);
+export const TransactionFormPage = lazy(() =>
+  finance().then((module) => ({ default: module.TransactionFormPage })),
+);
+export const TransferFormPage = lazy(() =>
+  finance().then((module) => ({ default: module.TransferFormPage })),
+);
 
 /** Écran de démarrage pendant le chargement d'une page hors shell (publique ou onboarding). */
 export function Suspended({ children }: Readonly<{ children: ReactNode }>): JSX.Element {

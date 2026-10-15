@@ -1,5 +1,9 @@
 export { FinanceOverviewPage } from './pages/finance-overview-page';
 export { AccountsPage } from './pages/accounts-page';
 export { AccountDetailPage } from './pages/account-detail-page';
+export { TransactionsPage } from './pages/transactions-page';
+export { TransactionDetailPage } from './pages/transaction-detail-page';
+export { TransactionFormPage } from './pages/transaction-form-page';
+export { TransferFormPage } from './pages/transfer-form-page';
 export { financeApi } from './api/finance.api';
 export * from './api/hooks';

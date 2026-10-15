@@ -4,13 +4,16 @@ import type {
   AccountResponse,
   BalancesReport,
   CategoryResponse,
+  CreateTransactionInput,
+  CreateTransferInput,
   TransactionResponse,
+  TransferResponse,
 } from '@orbit/contracts';
 
 import { server } from './msw-server';
 
 export const NOW = '2026-10-15T12:00:00.000Z';
-export const ID = (n: number): string => `0192f3a4-5b6c-7d8e-9f02-0000000000${String(n).padStart(2, '0')}`;
+export const ID = (n: number): string => `0192f3a4-5b6c-7d8e-9f02-${String(n).padStart(12, '0')}`;
 
 export function accountFixture(overrides: Partial<AccountResponse> = {}): AccountResponse {
   return {
@@ -134,15 +137,104 @@ function registerAccountRoutes(
   );
 }
 
-function registerFinanceAuxRoutes(balances: BalancesReport, transactions: TransactionResponse[]): void {
+function registerTransactionListAndGet(getTransactions: () => TransactionResponse[]): void {
   server.use(
-    http.get('/api/v1/finance/reports/balances', () => HttpResponse.json({ data: balances })),
     http.get('/api/v1/finance/transactions', () =>
       HttpResponse.json({
-        data: transactions,
+        data: getTransactions(),
         meta: { limit: 25, nextCursor: null, hasMore: false },
       }),
     ),
+    http.get('/api/v1/finance/transactions/:id', ({ params }) => {
+      const id = params['id'];
+      const found = getTransactions().find((t) => t.id === id);
+      if (!found) return new HttpResponse(null, { status: 404 });
+      return HttpResponse.json({ data: found });
+    }),
+  );
+}
+
+function registerTransactionMutations(
+  getTransactions: () => TransactionResponse[],
+  setTransactions: (txs: TransactionResponse[]) => void,
+): void {
+  server.use(
+    http.post('/api/v1/finance/transactions', async ({ request }) => {
+      const body = (await request.json()) as CreateTransactionInput;
+      const current = getTransactions();
+      const defaultEconomicClass = body.type === 'INCOME' ? 'INCOME_OPERATING' : 'EXPENSE_OPERATING';
+      const newTx = transactionFixture({
+        id: ID(current.length + 10),
+        type: body.type,
+        amountMinor: body.amountMinor,
+        currency: body.currency,
+        occurredAt: body.occurredAt,
+        valueDate: body.valueDate,
+        description: body.description ?? null,
+        notes: body.notes ?? null,
+        categoryId: body.categoryId ?? null,
+        counterpartyId: body.counterpartyId ?? null,
+        economicClass: body.economicClass ?? defaultEconomicClass,
+        status: body.status ?? 'VALIDATED',
+      });
+      setTransactions([...current, newTx]);
+      return HttpResponse.json({ data: newTx }, { status: 201 });
+    }),
+    http.post('/api/v1/finance/transactions/:id/validate', ({ params }) => {
+      const id = params['id'];
+      const updated = getTransactions().map((t) =>
+        t.id === id ? { ...t, status: 'VALIDATED' as const } : t,
+      );
+      setTransactions(updated);
+      return HttpResponse.json({ data: updated.find((t) => t.id === id) });
+    }),
+    http.post('/api/v1/finance/transactions/:id/cancel', async ({ params, request }) => {
+      const id = params['id'];
+      const body = (await request.json()) as { reason: string };
+      const updated = getTransactions().map((t) =>
+        t.id === id ? { ...t, status: 'CANCELLED' as const, cancelReason: body.reason, cancelledAt: NOW } : t,
+      );
+      setTransactions(updated);
+      return HttpResponse.json({ data: updated.find((t) => t.id === id) });
+    }),
+  );
+}
+
+function registerTransferMutation(
+  getTransactions: () => TransactionResponse[],
+  setTransactions: (txs: TransactionResponse[]) => void,
+): void {
+  server.use(
+    http.post('/api/v1/finance/transfers', async ({ request }) => {
+      const body = (await request.json()) as CreateTransferInput;
+      const current = getTransactions();
+      const newTx = transactionFixture({
+        id: ID(current.length + 10),
+        type: 'TRANSFER',
+        amountMinor: body.fromAmountMinor,
+        description: body.description ?? 'Transfert',
+      });
+      setTransactions([...current, newTx]);
+      const res: TransferResponse = {
+        id: ID(99),
+        fromAccountId: body.fromAccountId,
+        toAccountId: body.toAccountId,
+        fromAmountMinor: body.fromAmountMinor,
+        toAmountMinor: body.toAmountMinor ?? body.fromAmountMinor,
+        fromCurrency: 'XOF',
+        toCurrency: 'XOF',
+        exchangeRate: body.exchangeRate ?? null,
+        rateDate: body.rateDate ?? null,
+        transaction: newTx,
+      };
+      return HttpResponse.json({ data: res }, { status: 201 });
+    }),
+  );
+}
+
+function registerFinanceAuxRoutes(balances: BalancesReport): void {
+  server.use(
+    http.get('/api/v1/finance/reports/balances', () => HttpResponse.json({ data: balances })),
     http.get('/api/v1/finance/categories', () => HttpResponse.json({ data: [categoryFixture()] })),
     http.get('/api/v1/finance/counterparties', () =>
       HttpResponse.json({ data: [], meta: { limit: 25, nextCursor: null, hasMore: false } }),
@@ -163,7 +255,7 @@ export function mockFinanceEndpoints({
   getTransactions: () => TransactionResponse[];
 } {
   let accountsState = [...accounts];
-  const transactionsState = [...transactions];
+  let transactionsState = [...transactions];
 
   registerAccountRoutes(
     () => accountsState,
@@ -171,7 +263,20 @@ export function mockFinanceEndpoints({
       accountsState = next;
     },
   );
-  registerFinanceAuxRoutes(balances, transactionsState);
+  registerTransactionListAndGet(() => transactionsState);
+  registerTransactionMutations(
+    () => transactionsState,
+    (next) => {
+      transactionsState = next;
+    },
+  );
+  registerTransferMutation(
+    () => transactionsState,
+    (next) => {
+      transactionsState = next;
+    },
+  );
+  registerFinanceAuxRoutes(balances);
 
   return {
     getAccounts: () => accountsState,
