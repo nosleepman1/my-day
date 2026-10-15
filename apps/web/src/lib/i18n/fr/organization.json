@@ -1,0 +1,202 @@
+{
+  "markdown": {
+    "checked": "fait",
+    "unchecked": "à faire"
+  },
+  "actions": {
+    "create": "Créer",
+    "add": "Ajouter",
+    "delete": "Supprimer",
+    "archive": "Archiver",
+    "restore": "Restaurer",
+    "loadMore": "Charger plus",
+    "remove": "Retirer",
+    "open": "Ouvrir"
+  },
+  "feedback": {
+    "saved": "Modifications enregistrées.",
+    "deleted": "Élément supprimé.",
+    "archived": "Élément archivé.",
+    "restored": "Élément restauré.",
+    "deleteConfirm": "Supprimer cet élément ? Il disparaîtra de vos listes."
+  },
+  "fields": {
+    "title": "Titre",
+    "description": "Description",
+    "status": "Statut",
+    "priority": "Priorité",
+    "domain": "Domaine",
+    "potentialScore": "Potentiel (1 à 10)",
+    "decisionNote": "Décision",
+    "name": "Nom",
+    "type": "Type",
+    "startsOn": "Début",
+    "targetOn": "Échéance visée",
+    "dueDate": "Échéance",
+    "estimatedMinutes": "Durée estimée (minutes)",
+    "project": "Projet",
+    "noProject": "Aucun projet",
+    "content": "Contenu",
+    "kind": "Type de note",
+    "pinned": "Épinglée",
+    "color": "Couleur",
+    "tags": "Tags",
+    "search": "Rechercher",
+    "archived": "Afficher les éléments archivés"
+  },
+  "priority": {
+    "none": "Aucune",
+    "LOW": "Basse",
+    "MEDIUM": "Moyenne",
+    "HIGH": "Haute",
+    "URGENT": "Urgente"
+  },
+  "ideaStatus": {
+    "INBOX": "À trier",
+    "TO_REVIEW": "À examiner",
+    "EVALUATED": "Évaluée",
+    "SELECTED": "Retenue",
+    "IN_PROGRESS": "En cours",
+    "REALIZED": "Réalisée",
+    "ABANDONED": "Abandonnée"
+  },
+  "projectStatus": {
+    "PLANNED": "Prévu",
+    "ACTIVE": "Actif",
+    "ON_HOLD": "En pause",
+    "COMPLETED": "Terminé",
+    "ABANDONED": "Abandonné"
+  },
+  "projectType": {
+    "FREELANCE": "Freelance",
+    "PERSONAL_PRODUCT": "Produit personnel",
+    "LEARNING": "Apprentissage",
+    "INTERNAL": "Interne"
+  },
+  "taskStatus": {
+    "TODO": "À faire",
+    "IN_PROGRESS": "En cours",
+    "BLOCKED": "Bloquée",
+    "DONE": "Terminée",
+    "CANCELLED": "Annulée"
+  },
+  "noteKind": {
+    "NOTE": "Note",
+    "MEETING": "Réunion",
+    "REFERENCE": "Référence",
+    "CHECKLIST": "Liste",
+    "LOG": "Journal"
+  },
+  "views": {
+    "TODAY": "Aujourd'hui",
+    "OVERDUE": "En retard",
+    "THIS_WEEK": "Cette semaine",
+    "NO_DUE_DATE": "Sans échéance",
+    "ALL": "Toutes"
+  },
+  "filters": {
+    "allStatuses": "Tous les statuts"
+  },
+  "ideas": {
+    "title": "Idées",
+    "new": "Nouvelle idée",
+    "placeholder": "Une idée en une phrase…",
+    "empty": "Aucune idée pour l'instant.",
+    "emptyBody": "Notez une idée ci-dessus ou avec le bouton +.",
+    "convert": "Transformer en projet",
+    "converted": "Projet créé à partir de l'idée.",
+    "openProject": "Voir le projet issu de cette idée",
+    "similar": "Idées proches",
+    "similarEmpty": "Aucune idée proche.",
+    "capturedOn": "Capturée le {{date}}"
+  },
+  "projects": {
+    "title": "Projets",
+    "new": "Nouveau projet",
+    "placeholder": "Nom du projet",
+    "empty": "Aucun projet.",
+    "emptyBody": "Créez un projet ou transformez une idée.",
+    "progress": "Progression : {{percent}} %",
+    "noProgress": "Aucune tâche pour l'instant",
+    "taskCount": "{{done}} terminée(s) sur {{total}}, {{overdue}} en retard",
+    "tasksTitle": "Tâches du projet",
+    "sourceIdea": "Idée d'origine : {{title}}"
+  },
+  "tasks": {
+    "title": "Tâches",
+    "placeholder": "Nouvelle tâche…",
+    "empty": "Rien à faire ici.",
+    "emptyBody": "Ajoutez une tâche ci-dessus.",
+    "display": "Affichage",
+    "list": "Liste",
+    "kanban": "Kanban",
+    "complete": "Terminer « {{title}} »",
+    "reopen": "Rouvrir « {{title}} »",
+    "completeAction": "Terminer",
+    "reopenAction": "Rouvrir",
+    "overdue": "En retard",
+    "due": "Échéance : {{date}}",
+    "moveTo": "Déplacer « {{title}} » vers",
+    "subtasks": "Sous-tâches",
+    "subtaskPlaceholder": "Nouvelle sous-tâche…",
+    "dependsOn": "Dépend de",
+    "blocks": "Bloque",
+    "addDependency": "Ajouter une dépendance",
+    "chooseTask": "Choisir une tâche",
+    "noDependency": "Aucune dépendance.",
+    "history": "Historique",
+    "recurrence": "Récurrence",
+    "frequency": {
+      "NONE": "Pas de récurrence",
+      "DAILY": "Chaque jour",
+      "WEEKLY": "Chaque semaine",
+      "MONTHLY": "Chaque mois",
+      "YEARLY": "Chaque année"
+    },
+    "interval": "Intervalle",
+    "occurrence": "Occurrence du {{date}}",
+    "nextCreated": "Prochaine occurrence prévue le {{date}}.",
+    "historyKinds": {
+      "STATUS": "Statut : {{from}} → {{to}}",
+      "DUE_DATE": "Échéance : {{from}} → {{to}}",
+      "CREATED": "Création"
+    },
+    "none": "aucune"
+  },
+  "notes": {
+    "title": "Notes",
+    "new": "Nouvelle note",
+    "empty": "Aucune note.",
+    "emptyBody": "Créez une note ou capturez-en une avec le bouton +.",
+    "pinnedTitle": "Épinglées",
+    "othersTitle": "Autres notes",
+    "untitled": "Sans titre",
+    "write": "Écrire",
+    "preview": "Aperçu",
+    "previewEmpty": "Rien à afficher.",
+    "links": "Liens",
+    "addLink": "Relier",
+    "linkType": "Type d'élément",
+    "linkTarget": "Élément",
+    "noLinks": "Aucun lien.",
+    "linkTypes": {
+      "IDEA": "Idée",
+      "PROJECT": "Projet",
+      "TASK": "Tâche"
+    },
+    "linkedNotes": "Notes liées",
+    "noLinkedNotes": "Aucune note liée."
+  },
+  "tags": {
+    "title": "Tags",
+    "new": "Nouveau tag",
+    "placeholder": "Nom du tag",
+    "empty": "Aucun tag.",
+    "usage": "{{count}} élément(s)",
+    "merge": "Fusionner dans",
+    "mergeAction": "Fusionner",
+    "merged": "Tags fusionnés.",
+    "deleteConfirm": "Supprimer ce tag ? Il sera retiré de tous les éléments.",
+    "none": "Aucun tag"
+  }
+}

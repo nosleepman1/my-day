@@ -1,6 +1,6 @@
 # PHASE-04 : Organisation (idées, tâches, projets, tags, notes)
 
-- **Statut :** À faire
+- **Statut :** Terminée côté code, recette du propriétaire à faire (voir `progress/PHASE-04-REPORT.md`)
 - **Dépend de :** PHASE-02, PHASE-03
 - **Accès :** Tous
 - **Estimation :** 8 à 10 jours effectifs
