@@ -75,6 +75,42 @@ function OccurrencesSectionList({
   );
 }
 
+function OccurrenceActionModals({
+  confirmOcc,
+  skipOcc,
+  onCloseConfirm,
+  onCloseSkip,
+}: Readonly<{
+  confirmOcc: RecurringOccurrenceResponse | null;
+  skipOcc: RecurringOccurrenceResponse | null;
+  onCloseConfirm: () => void;
+  onCloseSkip: () => void;
+}>): JSX.Element {
+  return (
+    <>
+      {confirmOcc && (
+        <ConfirmOccurrenceDialog
+          open={!!confirmOcc}
+          onOpenChange={(open) => {
+            if (!open) onCloseConfirm();
+          }}
+          occurrence={confirmOcc}
+        />
+      )}
+
+      {skipOcc && (
+        <SkipOccurrenceDialog
+          open={!!skipOcc}
+          onOpenChange={(open) => {
+            if (!open) onCloseSkip();
+          }}
+          occurrence={skipOcc}
+        />
+      )}
+    </>
+  );
+}
+
 export function UpcomingOccurrencesPage(): JSX.Element {
   const { t } = useTranslation(['finance', 'common']);
   const [status, setStatus] = useState<OccurrenceStatus | ''>('');
@@ -114,25 +150,16 @@ export function UpcomingOccurrencesPage(): JSX.Element {
         </div>
       )}
 
-      {confirmOcc && (
-        <ConfirmOccurrenceDialog
-          open={!!confirmOcc}
-          onOpenChange={(open) => {
-            if (!open) setConfirmOcc(null);
-          }}
-          occurrence={confirmOcc}
-        />
-      )}
-
-      {skipOcc && (
-        <SkipOccurrenceDialog
-          open={!!skipOcc}
-          onOpenChange={(open) => {
-            if (!open) setSkipOcc(null);
-          }}
-          occurrence={skipOcc}
-        />
-      )}
+      <OccurrenceActionModals
+        confirmOcc={confirmOcc}
+        skipOcc={skipOcc}
+        onCloseConfirm={() => {
+          setConfirmOcc(null);
+        }}
+        onCloseSkip={() => {
+          setSkipOcc(null);
+        }}
+      />
     </div>
   );
 }

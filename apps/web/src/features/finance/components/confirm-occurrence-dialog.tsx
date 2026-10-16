@@ -165,6 +165,47 @@ function isConfirmDisabled(
   return mode === 'new' ? !accountId : !txId.trim();
 }
 
+function ConfirmOccurrenceHeader({
+  occurrence,
+}: Readonly<{ occurrence: RecurringOccurrenceResponse }>): JSX.Element {
+  const { t } = useTranslation(['finance']);
+  return (
+    <DialogHeader>
+      <DialogTitle>{t('confirmOccurrenceDialog.title')}</DialogTitle>
+      <DialogDescription>
+        {occurrence.recurringTransaction?.name ?? ''} —{' '}
+        <MoneyAmount
+          minor={occurrence.expectedAmountMinor}
+          currency={occurrence.currency}
+          className="font-semibold"
+        />
+      </DialogDescription>
+    </DialogHeader>
+  );
+}
+
+function ConfirmOccurrenceFooter({
+  onClose,
+  disabled,
+  isPending,
+}: Readonly<{
+  onClose: () => void;
+  disabled: boolean;
+  isPending: boolean;
+}>): JSX.Element {
+  const { t } = useTranslation(['common']);
+  return (
+    <DialogFooter>
+      <Button type="button" variant="secondary" onClick={onClose}>
+        {t('actions.cancel')}
+      </Button>
+      <Button type="submit" disabled={disabled || isPending}>
+        {isPending ? t('states.loading') : t('actions.confirm')}
+      </Button>
+    </DialogFooter>
+  );
+}
+
 function ConfirmOccurrenceForm({
   occurrence,
   onClose,
@@ -172,7 +213,7 @@ function ConfirmOccurrenceForm({
   occurrence: RecurringOccurrenceResponse;
   onClose: () => void;
 }>): JSX.Element {
-  const { t } = useTranslation(['finance', 'common']);
+  const { t } = useTranslation(['finance']);
   const online = useOnlineStatus();
   const [form, setForm] = useState<FormState>(() => initialFormState(occurrence));
 
@@ -194,17 +235,7 @@ function ConfirmOccurrenceForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <DialogHeader>
-        <DialogTitle>{t('confirmOccurrenceDialog.title')}</DialogTitle>
-        <DialogDescription>
-          {occurrence.recurringTransaction?.name ?? ''} —{' '}
-          <MoneyAmount
-            minor={occurrence.expectedAmountMinor}
-            currency={occurrence.currency}
-            className="font-semibold"
-          />
-        </DialogDescription>
-      </DialogHeader>
+      <ConfirmOccurrenceHeader occurrence={occurrence} />
 
       <ConfirmModeField
         mode={form.mode}
@@ -224,14 +255,7 @@ function ConfirmOccurrenceForm({
         />
       )}
 
-      <DialogFooter>
-        <Button type="button" variant="secondary" onClick={onClose}>
-          {t('common:actions.cancel')}
-        </Button>
-        <Button type="submit" disabled={disabled || mutation.isPending}>
-          {mutation.isPending ? t('common:states.loading') : t('common:actions.confirm')}
-        </Button>
-      </DialogFooter>
+      <ConfirmOccurrenceFooter onClose={onClose} disabled={disabled} isPending={mutation.isPending} />
     </form>
   );
 }

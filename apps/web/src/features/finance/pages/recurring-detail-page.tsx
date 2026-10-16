@@ -21,6 +21,44 @@ import { ConfirmOccurrenceDialog } from '../components/confirm-occurrence-dialog
 import { OccurrenceCard } from '../components/occurrence-card';
 import { SkipOccurrenceDialog } from '../components/skip-occurrence-dialog';
 
+function RecurringStatusActions({
+  item,
+  onPause,
+  onResume,
+  isPending,
+}: Readonly<{
+  item: RecurringTransactionResponse;
+  onPause: () => void;
+  onResume: () => void;
+  isPending: boolean;
+}>): JSX.Element {
+  const { t } = useTranslation('finance');
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Badge tone={item.status === 'ACTIVE' ? 'success' : item.status === 'PAUSED' ? 'warning' : 'neutral'}>
+        {item.status === 'ACTIVE'
+          ? t('recurring.active')
+          : item.status === 'PAUSED'
+            ? t('recurring.paused')
+            : t('recurring.ended')}
+      </Badge>
+
+      {item.status === 'ACTIVE' ? (
+        <Button variant="secondary" size="sm" onClick={onPause} disabled={isPending}>
+          <Pause aria-hidden="true" className="mr-1 size-3.5" />
+          {t('recurring.pause')}
+        </Button>
+      ) : item.status === 'PAUSED' ? (
+        <Button variant="secondary" size="sm" onClick={onResume} disabled={isPending}>
+          <Play aria-hidden="true" className="mr-1 size-3.5" />
+          {t('recurring.resume')}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 function RecurringDetailHeader({
   item,
   onPause,
@@ -49,29 +87,7 @@ function RecurringDetailHeader({
           <span className="text-body text-muted-foreground">{item.recurrenceRule}</span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge
-            tone={item.status === 'ACTIVE' ? 'success' : item.status === 'PAUSED' ? 'warning' : 'neutral'}
-          >
-            {item.status === 'ACTIVE'
-              ? t('recurring.active')
-              : item.status === 'PAUSED'
-                ? t('recurring.paused')
-                : t('recurring.ended')}
-          </Badge>
-
-          {item.status === 'ACTIVE' ? (
-            <Button variant="secondary" size="sm" onClick={onPause} disabled={isPending}>
-              <Pause aria-hidden="true" className="mr-1 size-3.5" />
-              {t('recurring.pause')}
-            </Button>
-          ) : item.status === 'PAUSED' ? (
-            <Button variant="secondary" size="sm" onClick={onResume} disabled={isPending}>
-              <Play aria-hidden="true" className="mr-1 size-3.5" />
-              {t('recurring.resume')}
-            </Button>
-          ) : null}
-        </div>
+        <RecurringStatusActions item={item} onPause={onPause} onResume={onResume} isPending={isPending} />
       </div>
     </header>
   );

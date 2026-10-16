@@ -190,7 +190,73 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
     counterparty: string;
     transaction: string;
     transfer: string;
+    debt: string;
+    repayment: string;
+    recurring: string;
+    occurrence: string;
   }>;
+
+  async function createDebtFixture(
+    owner: SignedInUser,
+    account: string,
+    counterparty: string,
+  ): Promise<{ debt: string; repayment: string }> {
+    const debt = await createAs(
+      owner,
+      '/finance/debts',
+      {
+        type: 'PAYABLE',
+        counterpartyId: counterparty,
+        title: 'Dette de A',
+        principalMinor: '50000',
+        currency: 'XOF',
+        openedOn: '2026-02-01',
+      },
+      { 'Idempotency-Key': randomUUID() },
+    );
+    const repayment = await createAs(
+      owner,
+      `/finance/debts/${debt}/repayments`,
+      {
+        amountMinor: '10000',
+        paidOn: '2026-02-02',
+        accountId: account,
+      },
+      { 'Idempotency-Key': randomUUID() },
+    );
+    return { debt, repayment };
+  }
+
+  async function createRecurringFixture(
+    owner: SignedInUser,
+    account: string,
+    category: string,
+  ): Promise<{ recurring: string; occurrence: string }> {
+    const recurring = await createAs(
+      owner,
+      '/finance/recurring',
+      {
+        name: 'Abonnement A',
+        type: 'EXPENSE',
+        economicClass: 'EXPENSE_OPERATING',
+        amountMinor: '5000',
+        currency: 'XOF',
+        recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1',
+        recurrenceAnchorOn: '2026-01-01',
+        recurrenceTimezone: 'Africa/Dakar',
+        accountId: account,
+        categoryId: category,
+      },
+      { 'Idempotency-Key': randomUUID() },
+    );
+    const occResponse = await http()
+      .get(`/api/v1/finance/recurring/${recurring}/occurrences?to=2026-03-01`)
+      .set(CSRF_HEADERS)
+      .set('Cookie', owner.cookie);
+    const firstOcc = (occResponse.body as { data: { id: string }[] }).data[0];
+    const occurrence = firstOcc ? firstOcc.id : SOME_ID;
+    return { recurring, occurrence };
+  }
 
   async function financeFixture(owner: SignedInUser): Promise<FinanceFixture> {
     const account = await createAs(owner, '/finance/accounts', {
@@ -240,7 +306,9 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       },
       { 'Idempotency-Key': randomUUID() },
     );
-    return { account, category, counterparty, transaction, transfer };
+    const { debt, repayment } = await createDebtFixture(owner, account, counterparty);
+    const { recurring, occurrence } = await createRecurringFixture(owner, account, category);
+    return { account, category, counterparty, transaction, transfer, debt, repayment, recurring, occurrence };
   }
 
   type FinanceCase = Readonly<{
@@ -350,6 +418,77 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       },
     ),
     'GET /api/v1/finance/transfers/:id': atFinance('get', (f) => `/finance/transfers/${f.transfer}`),
+    'GET /api/v1/finance/debts/:id': atFinance('get', (f) => `/finance/debts/${f.debt}`),
+    'PATCH /api/v1/finance/debts/:id': atFinance('patch', (f) => `/finance/debts/${f.debt}`, {
+      body: () => ({ title: 'Dette modifiée' }),
+    }),
+    'POST /api/v1/finance/debts/:id/cancel': atFinance('post', (f) => `/finance/debts/${f.debt}/cancel`, {
+      body: () => ({ closingReason: 'Annulation cross-user' }),
+    }),
+    'POST /api/v1/finance/debts/:id/write-off': atFinance(
+      'post',
+      (f) => `/finance/debts/${f.debt}/write-off`,
+      {
+        body: () => ({ closingReason: 'Radiation cross-user' }),
+      },
+    ),
+    'POST /api/v1/finance/debts/:id/repayments': atFinance(
+      'post',
+      (f) => `/finance/debts/${f.debt}/repayments`,
+      {
+        body: (f) => ({
+          amountMinor: '5000',
+          paidOn: '2026-02-03',
+          accountId: f.account,
+        }),
+      },
+    ),
+    'GET /api/v1/finance/debts/:id/repayments': atFinance(
+      'get',
+      (f) => `/finance/debts/${f.debt}/repayments`,
+    ),
+    'DELETE /api/v1/finance/debts/:id/repayments/:repaymentId': atFinance(
+      'delete',
+      (f) => `/finance/debts/${f.debt}/repayments/${f.repayment}`,
+    ),
+    'GET /api/v1/finance/recurring/:id': atFinance('get', (f) => `/finance/recurring/${f.recurring}`),
+    'PATCH /api/v1/finance/recurring/:id': atFinance('patch', (f) => `/finance/recurring/${f.recurring}`, {
+      body: () => ({ name: 'Abonnement modifié' }),
+    }),
+    'POST /api/v1/finance/recurring/:id/pause': atFinance(
+      'post',
+      (f) => `/finance/recurring/${f.recurring}/pause`,
+    ),
+    'POST /api/v1/finance/recurring/:id/resume': atFinance(
+      'post',
+      (f) => `/finance/recurring/${f.recurring}/resume`,
+    ),
+    'POST /api/v1/finance/recurring/:id/terminate': atFinance(
+      'post',
+      (f) => `/finance/recurring/${f.recurring}/terminate`,
+    ),
+    'GET /api/v1/finance/recurring/:id/occurrences': atFinance(
+      'get',
+      (f) => `/finance/recurring/${f.recurring}/occurrences`,
+    ),
+    'POST /api/v1/finance/recurring/occurrences/:id/confirm': atFinance(
+      'post',
+      (f) => `/finance/recurring/occurrences/${f.occurrence}/confirm`,
+      {
+        body: (f) => ({
+          amountMinor: '5000',
+          valueDate: '2026-01-01',
+          accountId: f.account,
+        }),
+      },
+    ),
+    'POST /api/v1/finance/recurring/occurrences/:id/skip': atFinance(
+      'post',
+      (f) => `/finance/recurring/occurrences/${f.occurrence}/skip`,
+      {
+        body: () => ({ reason: 'Occurrence sautée par intrus' }),
+      },
+    ),
   };
 
   function financeCase(spec: FinanceCase): CrossUserCase {

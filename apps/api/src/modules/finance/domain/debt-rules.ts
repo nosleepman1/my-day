@@ -1,4 +1,6 @@
-import type { DebtStatus, SettlementStatus } from '@orbit/contracts';
+import type { DebtStatus, DebtType, SettlementStatus } from '@orbit/contracts';
+
+import { DomainError } from '../../../platform/errors/domain-error';
 
 export type RepaymentEntry = Readonly<{
   amountMinor: bigint;
@@ -9,8 +11,14 @@ export type RepaymentEntry = Readonly<{
  * Calcule le solde restant d'une dette selon DATA_MODEL.md §3.5 et cahier §6.3 :
  * remaining = principal_minor − Σ debt_repayments.amount_minor (transactions VALIDATED uniquement).
  */
-export function computeDebtRemaining(principalMinor: bigint, repayments: readonly RepaymentEntry[]): bigint {
-  const totalValidated = repayments.reduce((sum, item) => {
+export function computeDebtRemaining(
+  principalMinor: bigint,
+  repayments: readonly (RepaymentEntry | bigint)[],
+): bigint {
+  const totalValidated = repayments.reduce((sum: bigint, item) => {
+    if (typeof item === 'bigint') {
+      return sum + item;
+    }
     if (item.transactionStatus === undefined || item.transactionStatus === 'VALIDATED') {
       return sum + item.amountMinor;
     }
@@ -72,4 +80,47 @@ export function validateRepaymentAmount(
     return { valid: false, error: 'OVERPAYMENT_REFUSED' };
   }
   return { valid: true };
+}
+
+/**
+ * Valide qu'un remboursement peut être effectué, lève un DomainError si invalide.
+ */
+export function assertCanRepayDebt(remainingMinor: bigint, repaymentAmountMinor: bigint): void {
+  const result = validateRepaymentAmount(remainingMinor, repaymentAmountMinor);
+  if (!result.valid) {
+    if (result.error === 'OVERPAYMENT_REFUSED') {
+      throw new DomainError('BUSINESS_RULE_VIOLATION', 'Le montant du remboursement dépasse le restant dû.');
+    }
+    throw new DomainError('VALIDATION_FAILED', 'Le montant du remboursement doit être strictement positif.');
+  }
+}
+
+/**
+ * Valide l'annulation d'une dette (FINANCE_RULES §6.6 / FIN-40).
+ */
+export function assertCanCancelDebt(params: { status: DebtStatus; hasValidatedRepayments: boolean }): void {
+  if (params.status !== 'OPEN') {
+    throw new DomainError('INVALID_STATE_TRANSITION', "La dette n'est plus ouverte.");
+  }
+  if (params.hasValidatedRepayments) {
+    throw new DomainError(
+      'BUSINESS_RULE_VIOLATION',
+      "Impossible d'annuler une dette ayant des remboursements validés.",
+    );
+  }
+}
+
+/**
+ * Valide le passage en perte d'une créance (FINANCE_RULES §6.6 / FIN-40).
+ */
+export function assertCanWriteOffDebt(params: { type: DebtType; status: DebtStatus; reason?: string }): void {
+  if (params.status !== 'OPEN') {
+    throw new DomainError('INVALID_STATE_TRANSITION', "La dette n'est plus ouverte.");
+  }
+  if (params.type !== 'RECEIVABLE') {
+    throw new DomainError('BUSINESS_RULE_VIOLATION', 'Seule une créance peut être passée en perte.');
+  }
+  if (params.reason?.trim().length === 0) {
+    throw new DomainError('VALIDATION_FAILED', 'Un motif est requis pour passer la créance en perte.');
+  }
 }

@@ -664,26 +664,30 @@ function registerAllDebtRoutes(state: DebtRouteState, getSummary: () => DebtSumm
   registerRepaymentRoutes(state);
 }
 
-export function mockFinanceEndpoints({
-  accounts = [accountFixture()],
-  transactions = [transactionFixture()],
-  balances = balancesFixture(),
-  debts = [debtFixture()],
-  repayments = [repaymentFixture()],
-  debtSummary = debtSummaryFixture(),
-}: {
-  accounts?: AccountResponse[];
-  transactions?: TransactionResponse[];
-  balances?: BalancesReport;
-  debts?: DebtResponse[];
-  repayments?: RepaymentResponse[];
-  debtSummary?: DebtSummaryResponse;
-} = {}): {
+export interface MockFinanceEndpointsOptions {
+  readonly accounts?: AccountResponse[];
+  readonly transactions?: TransactionResponse[];
+  readonly balances?: BalancesReport;
+  readonly debts?: DebtResponse[];
+  readonly repayments?: RepaymentResponse[];
+  readonly debtSummary?: DebtSummaryResponse;
+}
+
+export function mockFinanceEndpoints(options: MockFinanceEndpointsOptions = {}): {
   getAccounts: () => AccountResponse[];
   getTransactions: () => TransactionResponse[];
   getDebts: () => DebtResponse[];
   getRepayments: () => RepaymentResponse[];
 } {
+  const {
+    accounts = [accountFixture()],
+    transactions = [transactionFixture()],
+    balances = balancesFixture(),
+    debts = [debtFixture()],
+    repayments = [repaymentFixture()],
+    debtSummary = debtSummaryFixture(),
+  } = options;
+
   let accountsState = [...accounts];
   let transactionsState = [...transactions];
   let debtsState = [...debts];
