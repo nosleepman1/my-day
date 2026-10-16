@@ -1,29 +1,72 @@
 import { Injectable } from '@nestjs/common';
 
 import type {
+  ConfirmOccurrenceInput,
   CreateRecurringTransactionInput,
   CurrencyCode,
+  ListOccurrencesQuery,
   ListRecurringTransactionsQuery,
+  RecurringOccurrenceResponse,
   RecurringTransactionResponse,
+  SkipOccurrenceInput,
   UpdateRecurringTransactionInput,
 } from '@orbit/contracts';
 import {
+  ConfirmOccurrenceSchema,
   CreateRecurringTransactionSchema,
+  ListOccurrencesQuerySchema,
   ListRecurringTransactionsQuerySchema,
+  SkipOccurrenceSchema,
   UpdateRecurringTransactionSchema,
 } from '@orbit/contracts';
 
 import { AuditService } from '../../../platform/audit/audit.service';
 import { DomainError } from '../../../platform/errors/domain-error';
-import { generateOccurrences, parseFinanceRecurrence } from '../domain/recurrence-rules';
+import { generateOccurrences, isOccurrenceOverdue, parseFinanceRecurrence } from '../domain/recurrence-rules';
 import { FinanceContext } from '../shared/finance-context';
 
 import type {
+  CreateOccurrenceDbParams,
   CreateRecurringDbParams,
+  OccurrenceWithRelations,
   RecurringTransactionWithRelations,
   UpdateRecurringDbParams,
 } from './recurring.repository';
 import { RecurringRepository } from './recurring.repository';
+
+export function toOccurrenceResponse(
+  item: OccurrenceWithRelations,
+  todayCivil: string,
+): RecurringOccurrenceResponse {
+  const dueOnStr = item.dueOn.toISOString().slice(0, 10);
+  return {
+    id: item.id,
+    userId: item.userId,
+    recurringTransactionId: item.recurringTransactionId,
+    dueOn: dueOnStr,
+    expectedAmountMinor: item.expectedAmountMinor.toString(),
+    currency: item.currency as CurrencyCode,
+    status: item.status,
+    transactionId: item.transactionId,
+    confirmedAt: item.confirmedAt ? item.confirmedAt.toISOString() : null,
+    skippedAt: item.skippedAt ? item.skippedAt.toISOString() : null,
+    createdAt: item.createdAt.toISOString(),
+    isOverdue: isOccurrenceOverdue({
+      dueOn: dueOnStr,
+      status: item.status,
+      todayCivil,
+    }),
+    recurringTransaction: item.recurringTransaction
+      ? {
+          id: item.recurringTransaction.id,
+          name: item.recurringTransaction.name,
+          type: item.recurringTransaction.type,
+          economicClass: item.recurringTransaction.economicClass,
+          accountId: item.recurringTransaction.accountId,
+        }
+      : undefined,
+  };
+}
 
 export function toRecurringResponse(item: RecurringTransactionWithRelations): RecurringTransactionResponse {
   return {
@@ -367,5 +410,200 @@ export class RecurringService {
     });
 
     return toRecurringResponse(updated);
+  }
+
+  async materializeOccurrences(
+    userId: string,
+    recurringTransactionId: string,
+    toDateCivil: string,
+  ): Promise<number> {
+    const recurring = await this.repo.findById(userId, recurringTransactionId);
+    if (!recurring) {
+      throw new DomainError('NOT_FOUND', 'Transaction récurrente introuvable.');
+    }
+
+    const anchorDate = recurring.recurrenceAnchorOn.toISOString().slice(0, 10);
+    const dates = generateOccurrences({
+      recurrenceRule: recurring.recurrenceRule,
+      anchorDate,
+      fromDate: anchorDate,
+      toDate: toDateCivil,
+    });
+
+    const items: CreateOccurrenceDbParams[] = dates.map((dueOnCivil) => ({
+      id: this.ctx.newId(),
+      userId,
+      recurringTransactionId,
+      dueOn: new Date(`${dueOnCivil}T00:00:00.000Z`),
+      expectedAmountMinor: recurring.amountMinor,
+      currency: recurring.currency,
+      status: 'EXPECTED',
+    }));
+
+    return this.repo.createOccurrencesBatch(items);
+  }
+
+  async listOccurrences(
+    userId: string,
+    rawQuery: ListOccurrencesQuery,
+  ): Promise<{ items: RecurringOccurrenceResponse[]; nextCursor?: string }> {
+    const query = ListOccurrencesQuerySchema.parse(rawQuery);
+    const { items, nextCursor } = await this.repo.listOccurrences(userId, query);
+    const todayCivil = this.getTodayCivil();
+    return {
+      items: items.map((item) => toOccurrenceResponse(item, todayCivil)),
+      nextCursor,
+    };
+  }
+
+  async getOccurrenceById(userId: string, id: string): Promise<RecurringOccurrenceResponse> {
+    const item = await this.repo.findOccurrenceById(userId, id);
+    if (!item) {
+      throw new DomainError('NOT_FOUND', 'Occurrence introuvable.');
+    }
+    return toOccurrenceResponse(item, this.getTodayCivil());
+  }
+
+  private async attachExistingTransaction(
+    userId: string,
+    occurrenceId: string,
+    transactionId: string,
+    currency: string,
+  ): Promise<OccurrenceWithRelations> {
+    const tx = await this.ctx.db.transaction.findFirst({
+      where: { userId, id: transactionId },
+    });
+    if (!tx) {
+      throw new DomainError('NOT_FOUND', 'Transaction introuvable.');
+    }
+    if (tx.currency !== currency) {
+      throw new DomainError('CURRENCY_MISMATCH', 'Devise incompatible entre la transaction et l’occurrence.');
+    }
+
+    const updated = await this.repo.attachOccurrenceTransaction(
+      userId,
+      occurrenceId,
+      transactionId,
+      this.ctx.now(),
+    );
+
+    await this.audit.record({
+      action: 'finance.recurring.occurrence_confirm',
+      userId,
+      entityType: 'RecurringOccurrence',
+      entityId: occurrenceId,
+      outcome: 'SUCCESS',
+      metadata: { transactionId },
+    });
+
+    return updated;
+  }
+
+  private async createAndConfirmTransaction(
+    userId: string,
+    occurrence: OccurrenceWithRelations,
+    input: ReturnType<typeof ConfirmOccurrenceSchema.parse>,
+  ): Promise<OccurrenceWithRelations> {
+    const rec = occurrence.recurringTransaction;
+    if (!rec) {
+      throw new DomainError('NOT_FOUND', 'Transaction récurrente parente introuvable.');
+    }
+
+    const valueDate = input.valueDate ? new Date(`${input.valueDate}T00:00:00.000Z`) : occurrence.dueOn;
+    const amountMinor = input.amountMinor ? BigInt(input.amountMinor) : occurrence.expectedAmountMinor;
+    const accountId = input.accountId ?? rec.accountId;
+    const destinationAccountId = rec.destinationAccountId ?? null;
+    const description = input.notes ? `${rec.name} - ${input.notes}` : rec.name;
+
+    const updated = await this.repo.confirmOccurrenceWithTransaction({
+      userId,
+      occurrenceId: occurrence.id,
+      transactionId: this.ctx.newId(),
+      ledgerEntryId: this.ctx.newId(),
+      destinationLedgerEntryId: destinationAccountId ? this.ctx.newId() : null,
+      accountId,
+      destinationAccountId,
+      amountMinor,
+      currency: occurrence.currency,
+      type: rec.type,
+      economicClass: rec.economicClass,
+      valueDate,
+      description,
+      categoryId: rec.categoryId,
+      counterpartyId: rec.counterpartyId,
+      projectId: rec.projectId,
+      confirmedAt: this.ctx.now(),
+    });
+
+    await this.audit.record({
+      action: 'finance.recurring.occurrence_confirm',
+      userId,
+      entityType: 'RecurringOccurrence',
+      entityId: occurrence.id,
+      outcome: 'SUCCESS',
+      metadata: { transactionId: updated.transactionId },
+    });
+
+    return updated;
+  }
+
+  async confirmOccurrence(
+    userId: string,
+    occurrenceId: string,
+    rawInput: ConfirmOccurrenceInput,
+  ): Promise<RecurringOccurrenceResponse> {
+    const input = ConfirmOccurrenceSchema.parse(rawInput);
+    const occurrence = await this.repo.findOccurrenceById(userId, occurrenceId);
+    if (!occurrence) {
+      throw new DomainError('NOT_FOUND', 'Occurrence introuvable.');
+    }
+
+    if (occurrence.status === 'SKIPPED') {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Impossible de confirmer une occurrence ignorée.');
+    }
+    if (occurrence.status === 'CONFIRMED') {
+      return toOccurrenceResponse(occurrence, this.getTodayCivil());
+    }
+
+    const updated = input.transactionId
+      ? await this.attachExistingTransaction(userId, occurrenceId, input.transactionId, occurrence.currency)
+      : await this.createAndConfirmTransaction(userId, occurrence, input);
+
+    return toOccurrenceResponse(updated, this.getTodayCivil());
+  }
+
+  async skipOccurrence(
+    userId: string,
+    occurrenceId: string,
+    rawInput: SkipOccurrenceInput,
+  ): Promise<RecurringOccurrenceResponse> {
+    const input = SkipOccurrenceSchema.parse(rawInput);
+    const occurrence = await this.repo.findOccurrenceById(userId, occurrenceId);
+    if (!occurrence) {
+      throw new DomainError('NOT_FOUND', 'Occurrence introuvable.');
+    }
+
+    if (occurrence.status === 'CONFIRMED') {
+      throw new DomainError(
+        'INVALID_STATE_TRANSITION',
+        'Impossible d’ignorer une occurrence déjà confirmée.',
+      );
+    }
+    if (occurrence.status === 'SKIPPED') {
+      return toOccurrenceResponse(occurrence, this.getTodayCivil());
+    }
+
+    const updated = await this.repo.skipOccurrence(userId, occurrenceId, this.ctx.now());
+
+    await this.audit.record({
+      action: 'finance.recurring.occurrence_skip',
+      userId,
+      entityType: 'RecurringOccurrence',
+      entityId: occurrenceId,
+      outcome: 'SUCCESS',
+      metadata: { reason: input.reason },
+    });
+
+    return toOccurrenceResponse(updated, this.getTodayCivil());
   }
 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { RecurringTransactionResponse } from '@orbit/contracts';
+import type { RecurringOccurrenceResponse, RecurringTransactionResponse } from '@orbit/contracts';
 
 import type { TenantContext } from '../../../platform/tenant/tenant-context';
 
@@ -9,6 +9,7 @@ import type { RecurringService } from './recurring.service';
 
 const USER_1 = '01927000-0000-7000-8000-000000000001';
 const RECURRING_1 = '01927000-0000-7000-8000-000000000010';
+const OCCURRENCE_1 = '01927000-0000-7000-8000-000000000050';
 const ACCOUNT_1 = '01927000-0000-7000-8000-000000000020';
 
 describe('RecurringController', () => {
@@ -21,6 +22,10 @@ describe('RecurringController', () => {
     pause: ReturnType<typeof vi.fn>;
     resume: ReturnType<typeof vi.fn>;
     terminate: ReturnType<typeof vi.fn>;
+    listOccurrences: ReturnType<typeof vi.fn>;
+    confirmOccurrence: ReturnType<typeof vi.fn>;
+    skipOccurrence: ReturnType<typeof vi.fn>;
+    materializeOccurrences: ReturnType<typeof vi.fn>;
   };
   let mockTenant: {
     requireUserId: ReturnType<typeof vi.fn>;
@@ -53,6 +58,21 @@ describe('RecurringController', () => {
     updatedAt: '2026-10-01T10:00:00.000Z',
   };
 
+  const sampleOccurrenceResponse: RecurringOccurrenceResponse = {
+    id: OCCURRENCE_1,
+    userId: USER_1,
+    recurringTransactionId: RECURRING_1,
+    dueOn: '2026-10-05',
+    expectedAmountMinor: '25000',
+    currency: 'XOF',
+    status: 'EXPECTED',
+    transactionId: null,
+    confirmedAt: null,
+    skippedAt: null,
+    createdAt: '2026-10-01T10:00:00.000Z',
+    isOverdue: false,
+  };
+
   beforeEach(() => {
     mockService = {
       create: vi.fn().mockResolvedValue(sampleRecurringResponse),
@@ -62,6 +82,10 @@ describe('RecurringController', () => {
       pause: vi.fn().mockResolvedValue({ ...sampleRecurringResponse, status: 'PAUSED' }),
       resume: vi.fn().mockResolvedValue({ ...sampleRecurringResponse, status: 'ACTIVE' }),
       terminate: vi.fn().mockResolvedValue({ ...sampleRecurringResponse, status: 'ENDED' }),
+      listOccurrences: vi.fn().mockResolvedValue({ items: [sampleOccurrenceResponse], nextCursor: null }),
+      confirmOccurrence: vi.fn().mockResolvedValue({ ...sampleOccurrenceResponse, status: 'CONFIRMED' }),
+      skipOccurrence: vi.fn().mockResolvedValue({ ...sampleOccurrenceResponse, status: 'SKIPPED' }),
+      materializeOccurrences: vi.fn().mockResolvedValue(2),
     };
 
     mockTenant = {
@@ -151,5 +175,52 @@ describe('RecurringController', () => {
     expect(mockTenant.requireUserId).toHaveBeenCalled();
     expect(mockService.terminate).toHaveBeenCalledWith(USER_1, RECURRING_1);
     expect(result.data.status).toBe('ENDED');
+  });
+
+  it('listOccurrences delegates to service and returns list envelope', async () => {
+    const query = { limit: 20 };
+    const result = await controller.listOccurrences(query);
+
+    expect(mockTenant.requireUserId).toHaveBeenCalled();
+    expect(mockService.listOccurrences).toHaveBeenCalledWith(USER_1, query);
+    expect(result).toEqual({
+      data: [sampleOccurrenceResponse],
+      meta: {
+        limit: 20,
+        hasMore: false,
+        nextCursor: null,
+      },
+    });
+  });
+
+  it('confirmOccurrence delegates to service and returns envelope', async () => {
+    const result = await controller.confirmOccurrence({ id: OCCURRENCE_1 }, {});
+
+    expect(mockTenant.requireUserId).toHaveBeenCalled();
+    expect(mockService.confirmOccurrence).toHaveBeenCalledWith(USER_1, OCCURRENCE_1, {});
+    expect(result.data.status).toBe('CONFIRMED');
+  });
+
+  it('skipOccurrence delegates to service and returns envelope', async () => {
+    const result = await controller.skipOccurrence({ id: OCCURRENCE_1 }, { reason: 'Skip this' });
+
+    expect(mockTenant.requireUserId).toHaveBeenCalled();
+    expect(mockService.skipOccurrence).toHaveBeenCalledWith(USER_1, OCCURRENCE_1, {
+      reason: 'Skip this',
+    });
+    expect(result.data.status).toBe('SKIPPED');
+  });
+
+  it('listOccurrencesForRecurrence materializes if to is present and returns list envelope', async () => {
+    const query = { limit: 10, to: '2026-12-31' };
+    const result = await controller.listOccurrencesForRecurrence({ id: RECURRING_1 }, query);
+
+    expect(mockTenant.requireUserId).toHaveBeenCalled();
+    expect(mockService.materializeOccurrences).toHaveBeenCalledWith(USER_1, RECURRING_1, '2026-12-31');
+    expect(mockService.listOccurrences).toHaveBeenCalledWith(USER_1, {
+      ...query,
+      recurringTransactionId: RECURRING_1,
+    });
+    expect(result.data).toEqual([sampleOccurrenceResponse]);
   });
 });

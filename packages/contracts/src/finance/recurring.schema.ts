@@ -160,6 +160,7 @@ export const ConfirmOccurrenceSchema = z
   })
   .strict();
 export type ConfirmOccurrence = z.infer<typeof ConfirmOccurrenceSchema>;
+export type ConfirmOccurrenceInput = z.input<typeof ConfirmOccurrenceSchema>;
 
 export const SkipOccurrenceSchema = z
   .object({
@@ -167,6 +168,7 @@ export const SkipOccurrenceSchema = z
   })
   .strict();
 export type SkipOccurrence = z.infer<typeof SkipOccurrenceSchema>;
+export type SkipOccurrenceInput = z.input<typeof SkipOccurrenceSchema>;
 
 export const RecurringTransactionEnvelopeSchema = dataEnvelope(RecurringTransactionResponseSchema);
 export type RecurringTransactionEnvelope = z.infer<typeof RecurringTransactionEnvelopeSchema>;
