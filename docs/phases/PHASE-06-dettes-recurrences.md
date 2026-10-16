@@ -1,6 +1,6 @@
 # PHASE-06 : Dettes, créances, récurrences et prévisions
 
-- **Statut :** À faire
+- **Statut :** Terminée
 - **Dépend de :** PHASE-05
 - **Accès :** Tous
 - **Estimation :** 6 à 8 jours effectifs
