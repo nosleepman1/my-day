@@ -501,6 +501,16 @@ export class DebtsRepository {
         throw new DomainError('CONFLICT', 'Cette transaction est déjà rattachée à un remboursement.');
       }
 
+      const existingOccurrence = await tx.recurringOccurrence.findFirst({
+        where: { userId: params.userId, transactionId: params.transactionId },
+      });
+      if (existingOccurrence) {
+        throw new DomainError(
+          'CONFLICT',
+          'Cette transaction est déjà rattachée à une occurrence récurrente.',
+        );
+      }
+
       return tx.debtRepayment.create({
         data: {
           id: params.id,

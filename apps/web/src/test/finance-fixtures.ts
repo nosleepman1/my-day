@@ -673,6 +673,15 @@ export interface MockFinanceEndpointsOptions {
   readonly debtSummary?: DebtSummaryResponse;
 }
 
+function makeDebtRouteState(
+  getDebts: () => DebtResponse[],
+  setDebts: (d: DebtResponse[]) => void,
+  getRepayments: () => RepaymentResponse[],
+  setRepayments: (r: RepaymentResponse[]) => void,
+): DebtRouteState {
+  return { getDebts, setDebts, getRepayments, setRepayments };
+}
+
 export function mockFinanceEndpoints(options: MockFinanceEndpointsOptions = {}): {
   getAccounts: () => AccountResponse[];
   getTransactions: () => TransactionResponse[];
@@ -709,16 +718,16 @@ export function mockFinanceEndpoints(options: MockFinanceEndpointsOptions = {}):
   );
   registerFinanceAuxRoutes(balances);
 
-  const debtRouteState: DebtRouteState = {
-    getDebts: () => debtsState,
-    setDebts: (d) => {
+  const debtRouteState = makeDebtRouteState(
+    () => debtsState,
+    (d) => {
       debtsState = d;
     },
-    getRepayments: () => repaymentsState,
-    setRepayments: (r) => {
+    () => repaymentsState,
+    (r) => {
       repaymentsState = r;
     },
-  };
+  );
   registerAllDebtRoutes(debtRouteState, () => debtSummary);
 
   return {

@@ -40,6 +40,7 @@ describe('RecurringService - Occurrences (Task 8)', () => {
       transactionCategory: { findFirst: ReturnType<typeof vi.fn> };
       counterparty: { findFirst: ReturnType<typeof vi.fn> };
       transaction: { findFirst: ReturnType<typeof vi.fn> };
+      debtRepayment: { findFirst: ReturnType<typeof vi.fn> };
     };
   };
   let mockAudit: {
@@ -116,6 +117,7 @@ describe('RecurringService - Occurrences (Task 8)', () => {
         transactionCategory: { findFirst: vi.fn().mockResolvedValue(null) },
         counterparty: { findFirst: vi.fn().mockResolvedValue(null) },
         transaction: { findFirst: vi.fn() },
+        debtRepayment: { findFirst: vi.fn().mockResolvedValue(null) },
       },
     };
     mockAudit = { record: vi.fn().mockResolvedValue(undefined) };

@@ -132,9 +132,7 @@ export function projectAccountCashflow(params: ProjectAccountCashflowParams): Fo
     const dayInflows = occFlow.inflows + debtFlow.inflows;
     const dayOutflows = occFlow.outflows + debtFlow.outflows;
 
-    if (!isFirstDay) {
-      runningBalance = runningBalance + dayInflows - dayOutflows;
-    }
+    runningBalance = runningBalance + dayInflows - dayOutflows;
     if (runningBalance < lowestBalance) {
       lowestBalance = runningBalance;
     }

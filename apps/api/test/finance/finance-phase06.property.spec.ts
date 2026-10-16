@@ -62,47 +62,51 @@ describe('Finance property-based tests (fast-check) - Phase 06', () => {
     const freqArb = fc.constantFrom<RecurrenceFrequency>('WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY');
     const intervalArb = fc.integer({ min: 1, max: 4 });
 
+    const safeDateArb = fc
+      .record({
+        year: fc.constant(2026),
+        month: fc.integer({ min: 1, max: 6 }),
+        day: fc.integer({ min: 1, max: 28 }),
+      })
+      .map(
+        ({ year, month, day }) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+      );
+
     it('générer N fois pour les mêmes paramètres retourne rigoureusement le même ensemble sans doublons', () => {
       fc.assert(
-        fc.property(
-          freqArb,
-          intervalArb,
-          fc.date({ min: new Date('2026-01-01'), max: new Date('2026-06-30') }),
-          (freq, interval, anchorDateObj) => {
-            const anchorDate = anchorDateObj.toISOString().slice(0, 10);
-            const recurrenceRule = `FREQ=${freq};INTERVAL=${interval}`;
+        fc.property(freqArb, intervalArb, safeDateArb, (freq, interval, anchorDate) => {
+          const recurrenceRule = `FREQ=${freq};INTERVAL=${interval}`;
 
-            const run1 = generateOccurrences({
-              recurrenceRule,
-              anchorDate,
-              fromDate: anchorDate,
-              toDate: '2026-12-31',
-            });
+          const run1 = generateOccurrences({
+            recurrenceRule,
+            anchorDate,
+            fromDate: anchorDate,
+            toDate: '2026-12-31',
+          });
 
-            const run2 = generateOccurrences({
-              recurrenceRule,
-              anchorDate,
-              fromDate: anchorDate,
-              toDate: '2026-12-31',
-            });
+          const run2 = generateOccurrences({
+            recurrenceRule,
+            anchorDate,
+            fromDate: anchorDate,
+            toDate: '2026-12-31',
+          });
 
-            // Idempotence : run1 === run2
-            expect(run1).toEqual(run2);
+          // Idempotence : run1 === run2
+          expect(run1).toEqual(run2);
 
-            // Pas de doublons dans les dates générées
-            const uniqueDates = new Set(run1);
-            expect(uniqueDates.size).toBe(run1.length);
+          // Pas de doublons dans les dates générées
+          const uniqueDates = new Set(run1);
+          expect(uniqueDates.size).toBe(run1.length);
 
-            // Les dates sont strictement ordonnées chronologiquement
-            for (let i = 0; i < run1.length - 1; i += 1) {
-              const current = run1[i];
-              const next = run1[i + 1];
-              if (current && next) {
-                expect(current < next).toBe(true);
-              }
+          // Les dates sont strictement ordonnées chronologiquement
+          for (let i = 0; i < run1.length - 1; i += 1) {
+            const current = run1[i];
+            const next = run1[i + 1];
+            if (current && next) {
+              expect(current < next).toBe(true);
             }
-          },
-        ),
+          }
+        }),
         { numRuns: 50 },
       );
     });

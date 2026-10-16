@@ -120,7 +120,7 @@ export function assertCanWriteOffDebt(params: { type: DebtType; status: DebtStat
   if (params.type !== 'RECEIVABLE') {
     throw new DomainError('BUSINESS_RULE_VIOLATION', 'Seule une créance peut être passée en perte.');
   }
-  if (params.reason?.trim().length === 0) {
+  if (params.reason?.trim() === '') {
     throw new DomainError('VALIDATION_FAILED', 'Un motif est requis pour passer la créance en perte.');
   }
 }

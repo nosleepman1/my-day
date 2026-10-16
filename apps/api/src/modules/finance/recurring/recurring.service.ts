@@ -476,8 +476,21 @@ export class RecurringService {
     if (!tx) {
       throw new DomainError('NOT_FOUND', 'Transaction introuvable.');
     }
+    if (tx.status !== 'VALIDATED') {
+      throw new DomainError('BUSINESS_RULE_VIOLATION', 'Seule une transaction validée peut être rattachée.');
+    }
     if (tx.currency !== currency) {
       throw new DomainError('CURRENCY_MISMATCH', 'Devise incompatible entre la transaction et l’occurrence.');
+    }
+
+    const alreadyRepayment = await this.ctx.db.debtRepayment.findFirst({
+      where: { userId, transactionId },
+    });
+    if (alreadyRepayment) {
+      throw new DomainError(
+        'BUSINESS_RULE_VIOLATION',
+        'Cette transaction est déjà rattachée à un remboursement de dette.',
+      );
     }
 
     const updated = await this.repo.attachOccurrenceTransaction(

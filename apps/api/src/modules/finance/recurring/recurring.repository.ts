@@ -517,6 +517,16 @@ export class RecurringRepository {
   async confirmOccurrenceWithTransaction(params: ConfirmWithNewTxParams): Promise<OccurrenceWithRelations> {
     return this.ctx.db.$transaction(async (tx) => {
       const txClient = tx as unknown as Prisma.TransactionClient;
+      const occurrence = await tx.recurringOccurrence.findFirst({
+        where: { userId: params.userId, id: params.occurrenceId },
+      });
+      if (!occurrence) {
+        throw new DomainError('NOT_FOUND', 'Occurrence introuvable.');
+      }
+      if (occurrence.status !== 'EXPECTED') {
+        throw new DomainError('INVALID_STATE_TRANSITION', "Cette occurrence n'est plus en attente.");
+      }
+
       await this.validateAccountsAndOverdraft(txClient, params);
       await this.createOccurrenceTransaction(txClient, params);
       await this.insertOccurrenceLedgerEntries(txClient, params);
