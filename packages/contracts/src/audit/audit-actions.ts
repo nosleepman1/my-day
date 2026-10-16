@@ -47,6 +47,7 @@ export const AUDIT_ACTIONS = [
   'finance.recurring.update',
   'finance.recurring.pause',
   'finance.recurring.resume',
+  'finance.recurring.terminate',
   'finance.recurring.occurrence_confirm',
   'finance.recurring.occurrence_skip',
 ] as const;

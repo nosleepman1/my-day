@@ -63,7 +63,7 @@ export type CreateRecurringTransactionInput = z.input<typeof CreateRecurringTran
 
 export const UpdateRecurringTransactionSchema = z
   .object({
-    name: optionalText(120).optional(),
+    name: text(1, 120).optional(),
     amountMinor: PositiveMoneyStringSchema.optional(),
     accountId: z.uuid().optional(),
     destinationAccountId: z.uuid().nullable().optional(),
@@ -72,13 +72,14 @@ export const UpdateRecurringTransactionSchema = z
     projectId: z.uuid().nullable().optional(),
     generationMode: RecurringGenerationModeSchema.optional(),
     reminderDaysBefore: z.number().int().min(0).max(30).optional(),
-    recurrenceRule: optionalText(500).optional(),
-    recurrenceTimezone: optionalText(60).optional(),
+    recurrenceRule: text(1, 500).optional(),
+    recurrenceTimezone: text(1, 60).optional(),
     recurrenceLocalTime: LocalTimeSchema.nullable().optional(),
-    notes: optionalText(2000).nullable().optional(),
+    notes: optionalText(2000).optional(),
   })
   .strict();
 export type UpdateRecurringTransaction = z.infer<typeof UpdateRecurringTransactionSchema>;
+export type UpdateRecurringTransactionInput = z.input<typeof UpdateRecurringTransactionSchema>;
 
 export const ListRecurringTransactionsQuerySchema = PaginationQuerySchema.extend({
   status: RecurringStatusSchema.optional(),

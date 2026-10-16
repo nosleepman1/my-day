@@ -15,6 +15,7 @@ import {
   CancelDebtSchema,
   CancelTransactionSchema,
   CloseAccountSchema,
+  ConfirmOccurrenceSchema,
   ConfirmReconciliationSchema,
   CounterpartyEnvelopeSchema,
   CounterpartyListEnvelopeSchema,
@@ -22,6 +23,7 @@ import {
   CreateCategorySchema,
   CreateCounterpartySchema,
   CreateDebtSchema,
+  CreateRecurringTransactionSchema,
   CreateRepaymentSchema,
   CreateTransactionSchema,
   CreateTransferSchema,
@@ -36,14 +38,21 @@ import {
   ListCategoriesQuerySchema,
   ListCounterpartiesQuerySchema,
   ListDebtsQuerySchema,
+  ListOccurrencesQuerySchema,
+  ListRecurringTransactionsQuerySchema,
   ListTransactionsQuerySchema,
   MergeCounterpartySchema,
   ReconciliationQuerySchema,
   ReconciliationResultEnvelopeSchema,
   ReconciliationStatusEnvelopeSchema,
+  RecurringOccurrenceEnvelopeSchema,
+  RecurringOccurrenceListEnvelopeSchema,
+  RecurringTransactionEnvelopeSchema,
+  RecurringTransactionListEnvelopeSchema,
   ReopenAccountSchema,
   RepaymentEnvelopeSchema,
   RepaymentListEnvelopeSchema,
+  SkipOccurrenceSchema,
   TransactionEnvelopeSchema,
   TransactionListEnvelopeSchema,
   TransferEnvelopeSchema,
@@ -51,6 +60,7 @@ import {
   UpdateCategorySchema,
   UpdateCounterpartySchema,
   UpdateDebtSchema,
+  UpdateRecurringTransactionSchema,
   UpdateTransactionDetailsSchema,
   WriteOffDebtSchema,
 } from '@orbit/contracts';
@@ -123,3 +133,17 @@ export class CreateRepaymentDto extends createZodDto(CreateRepaymentSchema) {}
 export class RepaymentEnvelopeDto extends createZodDto(RepaymentEnvelopeSchema) {}
 export class RepaymentListEnvelopeDto extends createZodDto(RepaymentListEnvelopeSchema) {}
 export class DebtRepaymentParamDto extends createZodDto(DebtRepaymentParamSchema) {}
+
+export class CreateRecurringTransactionDto extends createZodDto(CreateRecurringTransactionSchema) {}
+export class UpdateRecurringTransactionDto extends createZodDto(UpdateRecurringTransactionSchema) {}
+export class ListRecurringTransactionsQueryDto extends createZodDto(ListRecurringTransactionsQuerySchema) {}
+export class RecurringTransactionEnvelopeDto extends createZodDto(RecurringTransactionEnvelopeSchema) {}
+export class RecurringTransactionListEnvelopeDto extends createZodDto(
+  RecurringTransactionListEnvelopeSchema,
+) {}
+
+export class ConfirmOccurrenceDto extends createZodDto(ConfirmOccurrenceSchema) {}
+export class SkipOccurrenceDto extends createZodDto(SkipOccurrenceSchema) {}
+export class ListOccurrencesQueryDto extends createZodDto(ListOccurrencesQuerySchema) {}
+export class RecurringOccurrenceEnvelopeDto extends createZodDto(RecurringOccurrenceEnvelopeSchema) {}
+export class RecurringOccurrenceListEnvelopeDto extends createZodDto(RecurringOccurrenceListEnvelopeSchema) {}

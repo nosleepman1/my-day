@@ -13,6 +13,9 @@ import { DebtsController } from './debts/debts.controller';
 import { DebtsRepository } from './debts/debts.repository';
 import { DebtsService } from './debts/debts.service';
 import { ReconciliationService } from './reconciliation/reconciliation.service';
+import { RecurringController } from './recurring/recurring.controller';
+import { RecurringRepository } from './recurring/recurring.repository';
+import { RecurringService } from './recurring/recurring.service';
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
 import { FinanceContext } from './shared/finance-context';
@@ -25,13 +28,14 @@ import { TransfersController } from './transfers/transfers.controller';
 import { TransfersRepository } from './transfers/transfers.repository';
 import { TransfersService } from './transfers/transfers.service';
 
-/** M04 Finance (PHASE-05) : comptes, catégories, contreparties, transactions, grand livre. */
+/** M04 Finance (PHASE-05, PHASE-06) : comptes, catégories, contreparties, transactions, dettes, récurrences. */
 @Module({
   controllers: [
     AccountsController,
     CategoriesController,
     CounterpartiesController,
     DebtsController,
+    RecurringController,
     ReportsController,
     TransactionsController,
     TransfersController,
@@ -47,6 +51,8 @@ import { TransfersService } from './transfers/transfers.service';
     DebtsRepository,
     DebtsService,
     ReconciliationService,
+    RecurringRepository,
+    RecurringService,
     ReportsService,
     TransactionReferences,
     TransactionsRepository,
@@ -66,6 +72,8 @@ import { TransfersService } from './transfers/transfers.service';
     DebtsRepository,
     DebtsService,
     ReconciliationService,
+    RecurringRepository,
+    RecurringService,
     ReportsService,
     TransactionReferences,
     TransactionsRepository,
