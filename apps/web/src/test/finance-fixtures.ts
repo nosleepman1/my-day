@@ -9,8 +9,13 @@ import type {
   CounterpartyResponse,
   CreateCategory,
   CreateCounterparty,
+  CreateDebtInput,
+  CreateRepaymentInput,
   CreateTransactionInput,
   CreateTransferInput,
+  DebtResponse,
+  DebtSummaryResponse,
+  RepaymentResponse,
   TransactionResponse,
   TransferResponse,
 } from '@orbit/contracts';
@@ -115,6 +120,76 @@ export function balancesFixture(overrides: Partial<BalancesReport> = {}): Balanc
     totalsByCurrency: {
       XOF: '150000',
     },
+    ...overrides,
+  };
+}
+
+export function debtFixture(overrides: Partial<DebtResponse> = {}): DebtResponse {
+  return {
+    id: ID(50),
+    userId: ID(100),
+    type: 'PAYABLE',
+    counterpartyId: ID(30),
+    title: 'Emprunt équipement',
+    description: 'Achat ordinateur portable',
+    principalMinor: '250000',
+    currency: 'XOF',
+    openedOn: '2026-10-01',
+    dueDate: '2026-12-01',
+    status: 'OPEN',
+    cancelledAt: null,
+    writtenOffAt: null,
+    closingReason: null,
+    notes: null,
+    totalRepaidMinor: '50000',
+    remainingMinor: '200000',
+    settlementStatus: 'PARTIALLY_SETTLED',
+    isOverdue: false,
+    counterparty: {
+      id: ID(30),
+      name: 'Auchan Supermarché',
+      kind: 'ORGANIZATION',
+    },
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+export function repaymentFixture(overrides: Partial<RepaymentResponse> = {}): RepaymentResponse {
+  return {
+    id: ID(70),
+    debtId: ID(50),
+    transactionId: ID(10),
+    amountMinor: '50000',
+    currency: 'XOF',
+    notes: 'Premier versement',
+    createdAt: NOW,
+    transaction: {
+      id: ID(10),
+      occurredAt: NOW,
+      valueDate: '2026-10-15',
+      status: 'VALIDATED',
+      amountMinor: '50000',
+      currency: 'XOF',
+    },
+    ...overrides,
+  };
+}
+
+export function debtSummaryFixture(overrides: Partial<DebtSummaryResponse> = {}): DebtSummaryResponse {
+  return {
+    currencies: [
+      {
+        currency: 'XOF',
+        totalPayableMinor: '250000',
+        totalReceivableMinor: '100000',
+        remainingPayableMinor: '200000',
+        remainingReceivableMinor: '100000',
+        overduePayableMinor: '0',
+        overdueReceivableMinor: '0',
+      },
+    ],
     ...overrides,
   };
 }
@@ -398,6 +473,174 @@ function registerAdjustmentAndReconciliationRoutes(): void {
   );
 }
 
+interface DebtRouteState {
+  getDebts: () => DebtResponse[];
+  setDebts: (debts: DebtResponse[]) => void;
+  getRepayments: () => RepaymentResponse[];
+  setRepayments: (reps: RepaymentResponse[]) => void;
+}
+
+function registerDebtQueryRoutes(
+  getDebts: () => DebtResponse[],
+  getDebtSummary: () => DebtSummaryResponse,
+): void {
+  server.use(
+    http.get('/api/v1/finance/debts/summary', () => HttpResponse.json({ data: getDebtSummary() })),
+    http.get('/api/v1/finance/debts', ({ request }) => {
+      const url = new URL(request.url);
+      const type = url.searchParams.get('type');
+      const status = url.searchParams.get('status');
+      const overdue = url.searchParams.get('overdue');
+      let items = getDebts();
+      if (type) items = items.filter((d) => d.type === type);
+      if (status) items = items.filter((d) => d.status === status);
+      if (overdue === 'true') items = items.filter((d) => d.isOverdue);
+      return HttpResponse.json({
+        data: items,
+        meta: { limit: 25, nextCursor: null, hasMore: false },
+      });
+    }),
+    http.get('/api/v1/finance/debts/:id', ({ params }) => {
+      const id = params['id'];
+      const found = getDebts().find((d) => d.id === id);
+      if (!found) return new HttpResponse(null, { status: 404 });
+      return HttpResponse.json({ data: found });
+    }),
+  );
+}
+
+function registerDebtCreatePatchRoutes(state: DebtRouteState): void {
+  server.use(
+    http.post('/api/v1/finance/debts', async ({ request }) => {
+      const body = (await request.json()) as CreateDebtInput;
+      const current = state.getDebts();
+      const newDebt = debtFixture({
+        id: ID(current.length + 50),
+        type: body.type,
+        counterpartyId: body.counterpartyId,
+        title: body.title,
+        description: body.description ?? null,
+        principalMinor: body.principalMinor,
+        currency: body.currency,
+        openedOn: body.openedOn,
+        dueDate: body.dueDate ?? null,
+        notes: body.notes ?? null,
+        totalRepaidMinor: '0',
+        remainingMinor: body.principalMinor,
+        settlementStatus: 'UNPAID',
+        isOverdue: false,
+      });
+      state.setDebts([...current, newDebt]);
+      return HttpResponse.json({ data: newDebt }, { status: 201 });
+    }),
+    http.patch('/api/v1/finance/debts/:id', async ({ params, request }) => {
+      const id = params['id'];
+      const body = (await request.json()) as Partial<DebtResponse>;
+      const current = state.getDebts();
+      const updated = current.map((d) => (d.id === id ? { ...d, ...body } : d));
+      state.setDebts(updated);
+      return HttpResponse.json({ data: updated.find((d) => d.id === id) });
+    }),
+  );
+}
+
+function registerDebtCloseRoutes(state: DebtRouteState): void {
+  server.use(
+    http.post('/api/v1/finance/debts/:id/cancel', async ({ params, request }) => {
+      const id = params['id'];
+      const body = (await request.json()) as { closingReason: string };
+      const current = state.getDebts();
+      const updated = current.map((d) =>
+        d.id === id
+          ? { ...d, status: 'CANCELLED' as const, closingReason: body.closingReason, cancelledAt: NOW }
+          : d,
+      );
+      state.setDebts(updated);
+      return HttpResponse.json({ data: updated.find((d) => d.id === id) });
+    }),
+    http.post('/api/v1/finance/debts/:id/write-off', async ({ params, request }) => {
+      const id = params['id'];
+      const body = (await request.json()) as { closingReason: string };
+      const current = state.getDebts();
+      const updated = current.map((d) =>
+        d.id === id
+          ? { ...d, status: 'WRITTEN_OFF' as const, closingReason: body.closingReason, writtenOffAt: NOW }
+          : d,
+      );
+      state.setDebts(updated);
+      return HttpResponse.json({ data: updated.find((d) => d.id === id) });
+    }),
+  );
+}
+
+function registerDebtMutationRoutes(state: DebtRouteState): void {
+  registerDebtCreatePatchRoutes(state);
+  registerDebtCloseRoutes(state);
+}
+
+function handleRepaymentCreated(debtId: string, amountMinor: string, state: DebtRouteState): void {
+  const debts = state.getDebts();
+  const updatedDebts = debts.map((d) => {
+    if (d.id !== debtId) return d;
+    const newRepaid = (BigInt(d.totalRepaidMinor) + BigInt(amountMinor)).toString();
+    const newRemaining = (BigInt(d.principalMinor) - BigInt(newRepaid)).toString();
+    const settlementStatus =
+      BigInt(newRemaining) <= 0n ? ('SETTLED' as const) : ('PARTIALLY_SETTLED' as const);
+    return { ...d, totalRepaidMinor: newRepaid, remainingMinor: newRemaining, settlementStatus };
+  });
+  state.setDebts(updatedDebts);
+}
+
+function handleRepaymentDeleted(debtId: string, amountMinor: string, state: DebtRouteState): void {
+  const debts = state.getDebts();
+  const updatedDebts = debts.map((d) => {
+    if (d.id !== debtId) return d;
+    const newRepaid = (BigInt(d.totalRepaidMinor) - BigInt(amountMinor)).toString();
+    const newRemaining = (BigInt(d.principalMinor) - BigInt(newRepaid)).toString();
+    const settlementStatus = BigInt(newRepaid) === 0n ? ('UNPAID' as const) : ('PARTIALLY_SETTLED' as const);
+    return { ...d, totalRepaidMinor: newRepaid, remainingMinor: newRemaining, settlementStatus };
+  });
+  state.setDebts(updatedDebts);
+}
+
+function registerRepaymentRoutes(state: DebtRouteState): void {
+  server.use(
+    http.get('/api/v1/finance/debts/:id/repayments', ({ params }) => {
+      const id = params['id'];
+      const items = state.getRepayments().filter((r) => r.debtId === id);
+      return HttpResponse.json({
+        data: items,
+        meta: { limit: items.length || 1, nextCursor: null, hasMore: false },
+      });
+    }),
+    http.post('/api/v1/finance/debts/:id/repayments', async ({ params, request }) => {
+      const debtId = params['id'] as string;
+      const body = (await request.json()) as CreateRepaymentInput;
+      const currentReps = state.getRepayments();
+      const newRep = repaymentFixture({
+        id: ID(currentReps.length + 70),
+        debtId,
+        amountMinor: body.amountMinor,
+        notes: body.notes ?? null,
+      });
+      state.setRepayments([...currentReps, newRep]);
+      handleRepaymentCreated(debtId, body.amountMinor, state);
+      return HttpResponse.json({ data: newRep }, { status: 201 });
+    }),
+    http.delete('/api/v1/finance/debts/:id/repayments/:repaymentId', ({ params }) => {
+      const debtId = params['id'] as string;
+      const repaymentId = params['repaymentId'] as string;
+      const currentReps = state.getRepayments();
+      const target = currentReps.find((r) => r.id === repaymentId);
+      state.setRepayments(currentReps.filter((r) => r.id !== repaymentId));
+      if (target) {
+        handleRepaymentDeleted(debtId, target.amountMinor, state);
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+}
+
 function registerFinanceAuxRoutes(balances: BalancesReport): void {
   registerSummaryAndBalancesRoutes(balances);
   registerBreakdownAndCashflowRoutes();
@@ -405,44 +648,78 @@ function registerFinanceAuxRoutes(balances: BalancesReport): void {
   registerAdjustmentAndReconciliationRoutes();
 }
 
+function registerCoreFinanceEndpoints(
+  accountsState: { get: () => AccountResponse[]; set: (a: AccountResponse[]) => void },
+  transactionsState: { get: () => TransactionResponse[]; set: (t: TransactionResponse[]) => void },
+): void {
+  registerAccountRoutes(accountsState.get, accountsState.set);
+  registerTransactionListAndGet(transactionsState.get);
+  registerTransactionMutations(transactionsState.get, transactionsState.set);
+  registerTransferMutation(transactionsState.get, transactionsState.set);
+}
+
 export function mockFinanceEndpoints({
   accounts = [accountFixture()],
   transactions = [transactionFixture()],
   balances = balancesFixture(),
+  debts = [debtFixture()],
+  repayments = [repaymentFixture()],
+  debtSummary = debtSummaryFixture(),
 }: {
   accounts?: AccountResponse[];
   transactions?: TransactionResponse[];
   balances?: BalancesReport;
+  debts?: DebtResponse[];
+  repayments?: RepaymentResponse[];
+  debtSummary?: DebtSummaryResponse;
 } = {}): {
   getAccounts: () => AccountResponse[];
   getTransactions: () => TransactionResponse[];
+  getDebts: () => DebtResponse[];
+  getRepayments: () => RepaymentResponse[];
 } {
   let accountsState = [...accounts];
   let transactionsState = [...transactions];
+  let debtsState = [...debts];
+  let repaymentsState = [...repayments];
 
-  registerAccountRoutes(
-    () => accountsState,
-    (next) => {
-      accountsState = next;
+  registerCoreFinanceEndpoints(
+    {
+      get: () => accountsState,
+      set: (a) => {
+        accountsState = a;
+      },
     },
-  );
-  registerTransactionListAndGet(() => transactionsState);
-  registerTransactionMutations(
-    () => transactionsState,
-    (next) => {
-      transactionsState = next;
-    },
-  );
-  registerTransferMutation(
-    () => transactionsState,
-    (next) => {
-      transactionsState = next;
+    {
+      get: () => transactionsState,
+      set: (t) => {
+        transactionsState = t;
+      },
     },
   );
   registerFinanceAuxRoutes(balances);
 
+  const debtRouteState: DebtRouteState = {
+    getDebts: () => debtsState,
+    setDebts: (d) => {
+      debtsState = d;
+    },
+    getRepayments: () => repaymentsState,
+    setRepayments: (r) => {
+      repaymentsState = r;
+    },
+  };
+  registerDebtQueryRoutes(
+    () => debtsState,
+    () => debtSummary,
+  );
+  registerDebtMutationRoutes(debtRouteState);
+  registerRepaymentRoutes(debtRouteState);
+
   return {
     getAccounts: () => accountsState,
     getTransactions: () => transactionsState,
+    getDebts: () => debtsState,
+    getRepayments: () => repaymentsState,
   };
 }

@@ -39,10 +39,20 @@ export const financeKeys = {
   counterparties: (params?: Params) => [...financeKeys.all, 'counterparties', params] as const,
   transactions: (params?: Params) => [...financeKeys.all, 'transactions', params] as const,
   transaction: (id: string) => [...financeKeys.all, 'transaction', id] as const,
+  debts: (params?: Params) => [...financeKeys.all, 'debts', params] as const,
+  debt: (id: string) => [...financeKeys.all, 'debt', id] as const,
+  debtSummary: () => [...financeKeys.all, 'debts', 'summary'] as const,
+  debtRepayments: (id: string) => [...financeKeys.debt(id), 'repayments'] as const,
+  recurringTransactions: (params?: Params) =>
+    [...financeKeys.all, 'recurring', 'transactions', params] as const,
+  recurringTransaction: (id: string) => [...financeKeys.all, 'recurring', 'transaction', id] as const,
+  recurringOccurrences: (params?: Params) =>
+    [...financeKeys.all, 'recurring', 'occurrences', params] as const,
   reports: {
     summary: (params?: Params) => [...financeKeys.all, 'reports', 'summary', params] as const,
     balances: () => [...financeKeys.all, 'reports', 'balances'] as const,
     byCategory: (params?: Params) => [...financeKeys.all, 'reports', 'by-category', params] as const,
     cashflow: (params?: Params) => [...financeKeys.all, 'reports', 'cashflow', params] as const,
+    forecast: (params?: Params) => [...financeKeys.all, 'reports', 'forecast', params] as const,
   },
 };

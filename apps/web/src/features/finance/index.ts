@@ -8,5 +8,8 @@ export { TransferFormPage } from './pages/transfer-form-page';
 export { CategoriesPage } from './pages/categories-page';
 export { CounterpartiesPage } from './pages/counterparties-page';
 export { ReportsPage } from './pages/reports-page';
+export { DebtsPage } from './pages/debts-page';
+export { DebtFormPage } from './pages/debt-form-page';
+export { DebtDetailPage } from './pages/debt-detail-page';
 export { financeApi } from './api/finance.api';
 export * from './api/hooks';

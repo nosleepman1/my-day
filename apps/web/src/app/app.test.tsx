@@ -138,9 +138,9 @@ describe('shell and navigation', () => {
   it('shows « coming soon » for an enabled module and « disabled » otherwise', async () => {
     mockSession(
       sessionUser(),
-      preferences({ enabledModules: ['ideas', 'tasks', 'notes', 'finance', 'debts'] }),
+      preferences({ enabledModules: ['ideas', 'tasks', 'notes', 'finance', 'debts', 'calendar'] }),
     );
-    const { router } = renderApp('/finance/debts');
+    const { router } = renderApp('/calendar');
 
     expect(await screen.findByText('Bientôt disponible')).toBeInTheDocument();
     await router.navigate('/pro');

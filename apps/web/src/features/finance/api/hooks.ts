@@ -18,14 +18,19 @@ import type {
   CategoryBreakdownQuery,
   CategoryListEnvelope,
   CounterpartyListEnvelope,
+  DebtEnvelope,
+  DebtListEnvelope,
+  DebtSummaryEnvelope,
   FinanceSummaryEnvelope,
   FinanceSummaryQuery,
   ListAccountsQuery,
   ListCategoriesQuery,
   ListCounterpartiesQuery,
+  ListDebtsQuery,
   ListTransactionsQuery,
   ReconciliationQuery,
   ReconciliationStatusEnvelope,
+  RepaymentListEnvelope,
   TransactionEnvelope,
   TransactionListEnvelope,
 } from '@orbit/contracts';
@@ -147,6 +152,44 @@ export function useFinanceCashFlowReport(
     queryKey: financeKeys.reports.cashflow(params as unknown as Record<string, string | undefined>),
     queryFn: ({ signal }) => financeApi.cashFlowReport(params, signal),
     enabled,
+  });
+}
+
+export function useFinanceDebts(
+  params?: Partial<ListDebtsQuery>,
+  enabled = true,
+): UseQueryResult<DebtListEnvelope> {
+  return useQuery({
+    queryKey: financeKeys.debts(params as unknown as Record<string, string | undefined>),
+    queryFn: ({ signal }) => financeApi.debts(params, signal),
+    enabled,
+  });
+}
+
+export function useFinanceDebt(id: string, enabled = true): UseQueryResult<DebtEnvelope> {
+  return useQuery({
+    queryKey: financeKeys.debt(id),
+    queryFn: ({ signal }) => financeApi.debt(id, signal),
+    enabled: enabled && id !== '',
+  });
+}
+
+export function useFinanceDebtSummary(enabled = true): UseQueryResult<DebtSummaryEnvelope> {
+  return useQuery({
+    queryKey: financeKeys.debtSummary(),
+    queryFn: ({ signal }) => financeApi.debtSummary(signal),
+    enabled,
+  });
+}
+
+export function useFinanceDebtRepayments(
+  debtId: string,
+  enabled = true,
+): UseQueryResult<RepaymentListEnvelope> {
+  return useQuery({
+    queryKey: financeKeys.debtRepayments(debtId),
+    queryFn: ({ signal }) => financeApi.debtRepayments(debtId, signal),
+    enabled: enabled && debtId !== '',
   });
 }
 

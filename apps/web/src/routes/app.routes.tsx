@@ -14,6 +14,9 @@ import {
   AccountsPage,
   CategoriesPage,
   CounterpartiesPage,
+  DebtDetailPage,
+  DebtFormPage,
+  DebtsPage,
   FinanceOverviewPage,
   HomePage,
   IdeaDetailPage,
@@ -68,6 +71,15 @@ const financeRoutes: RouteObject[] = [
       { path: 'categories', element: <CategoriesPage /> },
       { path: 'counterparties', element: <CounterpartiesPage /> },
       { path: 'reports', element: <ReportsPage /> },
+      {
+        path: 'debts',
+        element: <ModuleGate module="debts" />,
+        children: [
+          { index: true, element: <DebtsPage /> },
+          { path: 'new', element: <DebtFormPage /> },
+          { path: ':id', element: <DebtDetailPage /> },
+        ],
+      },
     ],
   },
 ];

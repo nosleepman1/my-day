@@ -30,7 +30,7 @@ export function preferences(overrides: Partial<Preferences> = {}): Preferences {
     dateFormat: 'dd/MM/yyyy',
     weekStartsOn: 1,
     theme: 'SYSTEM',
-    enabledModules: ['ideas', 'tasks', 'notes', 'finance'],
+    enabledModules: ['ideas', 'tasks', 'notes', 'finance', 'debts'],
     onboardingCompletedAt: INSTANT,
     ...overrides,
   };

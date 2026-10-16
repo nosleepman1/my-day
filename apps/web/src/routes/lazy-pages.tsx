@@ -87,6 +87,9 @@ export const CounterpartiesPage = lazy(() =>
   finance().then((module) => ({ default: module.CounterpartiesPage })),
 );
 export const ReportsPage = lazy(() => finance().then((module) => ({ default: module.ReportsPage })));
+export const DebtsPage = lazy(() => finance().then((module) => ({ default: module.DebtsPage })));
+export const DebtFormPage = lazy(() => finance().then((module) => ({ default: module.DebtFormPage })));
+export const DebtDetailPage = lazy(() => finance().then((module) => ({ default: module.DebtDetailPage })));
 
 /** Écran de démarrage pendant le chargement d'une page hors shell (publique ou onboarding). */
 export function Suspended({ children }: Readonly<{ children: ReactNode }>): JSX.Element {

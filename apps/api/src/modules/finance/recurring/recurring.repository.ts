@@ -467,52 +467,58 @@ export class RecurringRepository {
     }
   }
 
+  private async validateAccountsAndOverdraft(
+    txClient: Prisma.TransactionClient,
+    params: ConfirmWithNewTxParams,
+  ): Promise<void> {
+    const lockIds = [params.accountId];
+    if (params.type === 'TRANSFER' && params.destinationAccountId) {
+      lockIds.push(params.destinationAccountId);
+    }
+    await this.accountLocking.lockAccounts(txClient, params.userId, lockIds);
+    const origin = await this.validateAccountForTx(
+      txClient,
+      params.userId,
+      params.accountId,
+      params.currency,
+    );
+    if (params.type === 'EXPENSE' || params.type === 'TRANSFER') {
+      await this.assertOverdraft(txClient, params.userId, origin, params.amountMinor);
+    }
+    if (params.type === 'TRANSFER' && params.destinationAccountId) {
+      await this.validateAccountForTx(txClient, params.userId, params.destinationAccountId, params.currency);
+    }
+  }
+
+  private async createOccurrenceTransaction(
+    tx: Prisma.TransactionClient,
+    params: ConfirmWithNewTxParams,
+  ): Promise<void> {
+    await tx.transaction.create({
+      data: {
+        id: params.transactionId,
+        userId: params.userId,
+        type: params.type,
+        status: 'VALIDATED',
+        economicClass: params.economicClass,
+        amountMinor: params.amountMinor,
+        currency: params.currency,
+        occurredAt: params.confirmedAt,
+        valueDate: params.valueDate,
+        description: params.description,
+        categoryId: params.categoryId ?? null,
+        counterpartyId: params.counterpartyId ?? null,
+        projectId: params.projectId ?? null,
+        source: 'RECURRENCE',
+      },
+    });
+  }
+
   async confirmOccurrenceWithTransaction(params: ConfirmWithNewTxParams): Promise<OccurrenceWithRelations> {
     return this.ctx.db.$transaction(async (tx) => {
       const txClient = tx as unknown as Prisma.TransactionClient;
-      const lockIds = [params.accountId];
-      if (params.type === 'TRANSFER' && params.destinationAccountId) {
-        lockIds.push(params.destinationAccountId);
-      }
-      await this.accountLocking.lockAccounts(txClient, params.userId, lockIds);
-
-      const originAccount = await this.validateAccountForTx(
-        txClient,
-        params.userId,
-        params.accountId,
-        params.currency,
-      );
-      if (params.type === 'EXPENSE' || params.type === 'TRANSFER') {
-        await this.assertOverdraft(txClient, params.userId, originAccount, params.amountMinor);
-      }
-      if (params.type === 'TRANSFER' && params.destinationAccountId) {
-        await this.validateAccountForTx(
-          txClient,
-          params.userId,
-          params.destinationAccountId,
-          params.currency,
-        );
-      }
-
-      await tx.transaction.create({
-        data: {
-          id: params.transactionId,
-          userId: params.userId,
-          type: params.type,
-          status: 'VALIDATED',
-          economicClass: params.economicClass,
-          amountMinor: params.amountMinor,
-          currency: params.currency,
-          occurredAt: params.confirmedAt,
-          valueDate: params.valueDate,
-          description: params.description,
-          categoryId: params.categoryId ?? null,
-          counterpartyId: params.counterpartyId ?? null,
-          projectId: params.projectId ?? null,
-          source: 'RECURRENCE',
-        },
-      });
-
+      await this.validateAccountsAndOverdraft(txClient, params);
+      await this.createOccurrenceTransaction(txClient, params);
       await this.insertOccurrenceLedgerEntries(txClient, params);
 
       return tx.recurringOccurrence.update({

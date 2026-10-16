@@ -5,6 +5,7 @@ import {
   AccountEnvelopeSchema,
   AccountListEnvelopeSchema,
   BalancesReportEnvelopeSchema,
+  CancelDebtSchema,
   CancelTransactionSchema,
   CashFlowEnvelopeSchema,
   CategoryBreakdownEnvelopeSchema,
@@ -17,24 +18,34 @@ import {
   CreateAccountSchema,
   CreateCategorySchema,
   CreateCounterpartySchema,
+  CreateDebtSchema,
+  CreateRepaymentSchema,
   CreateTransactionSchema,
   CreateTransferSchema,
+  DebtEnvelopeSchema,
+  DebtListEnvelopeSchema,
+  DebtSummaryEnvelopeSchema,
   FinanceSummaryEnvelopeSchema,
   ReconciliationResultEnvelopeSchema,
   ReconciliationStatusEnvelopeSchema,
   ReopenAccountSchema,
+  RepaymentEnvelopeSchema,
+  RepaymentListEnvelopeSchema,
   TransactionEnvelopeSchema,
   TransactionListEnvelopeSchema,
   TransferEnvelopeSchema,
   UpdateAccountSchema,
   UpdateCategorySchema,
   UpdateCounterpartySchema,
+  UpdateDebtSchema,
   UpdateTransactionDetailsSchema,
+  WriteOffDebtSchema,
   type AccountAdjustmentInput,
   type AccountEnvelope,
   type AccountListEnvelope,
   type BalancesReportEnvelope,
   type BalancesReportQuery,
+  type CancelDebtInput,
   type CancelTransaction,
   type CashFlowEnvelope,
   type CashFlowQuery,
@@ -48,24 +59,34 @@ import {
   type CreateAccountInput,
   type CreateCategory,
   type CreateCounterparty,
+  type CreateDebtInput,
+  type CreateRepaymentInput,
   type CreateTransactionInput,
   type CreateTransferInput,
+  type DebtEnvelope,
+  type DebtListEnvelope,
+  type DebtSummaryEnvelope,
   type FinanceSummaryEnvelope,
   type FinanceSummaryQuery,
   type ListAccountsQuery,
   type ListCategoriesQuery,
   type ListCounterpartiesQuery,
+  type ListDebtsQuery,
   type ListTransactionsQuery,
   type ReconciliationQuery,
   type ReconciliationResultEnvelope,
   type ReconciliationStatusEnvelope,
+  type RepaymentEnvelope,
+  type RepaymentListEnvelope,
   type TransactionEnvelope,
   type TransactionListEnvelope,
   type TransferEnvelope,
   type UpdateAccount,
   type UpdateCategory,
   type UpdateCounterparty,
+  type UpdateDebt,
   type UpdateTransactionDetails,
+  type WriteOffDebtInput,
 } from '@orbit/contracts';
 
 import { http, type RequestOptions } from '@/lib/http/client';
@@ -293,4 +314,74 @@ export const financeApi = {
       CashFlowEnvelopeSchema,
       signalOf(signal),
     ),
+
+  // --- Dettes & Créances ---
+  debts: (params?: Partial<ListDebtsQuery>, signal?: AbortSignal): Promise<DebtListEnvelope> =>
+    http(
+      `/finance/debts${queryString(params as unknown as ListParams)}`,
+      DebtListEnvelopeSchema,
+      signalOf(signal),
+    ),
+
+  debt: (id: string, signal?: AbortSignal): Promise<DebtEnvelope> =>
+    http(`/finance/debts/${id}`, DebtEnvelopeSchema, signalOf(signal)),
+
+  debtSummary: (signal?: AbortSignal): Promise<DebtSummaryEnvelope> =>
+    http('/finance/debts/summary', DebtSummaryEnvelopeSchema, signalOf(signal)),
+
+  createDebt: (body: CreateDebtInput, idempotencyKey: string): Promise<DebtEnvelope> => {
+    const validBody = CreateDebtSchema.parse(body);
+    return http('/finance/debts', DebtEnvelopeSchema, {
+      method: 'POST',
+      body: validBody,
+      idempotencyKey,
+    });
+  },
+
+  updateDebt: (id: string, body: UpdateDebt): Promise<DebtEnvelope> => {
+    const validBody = UpdateDebtSchema.parse(body);
+    return http(`/finance/debts/${id}`, DebtEnvelopeSchema, {
+      method: 'PATCH',
+      body: validBody,
+    });
+  },
+
+  cancelDebt: (id: string, body: CancelDebtInput, idempotencyKey: string): Promise<DebtEnvelope> => {
+    const validBody = CancelDebtSchema.parse(body);
+    return http(`/finance/debts/${id}/cancel`, DebtEnvelopeSchema, {
+      method: 'POST',
+      body: validBody,
+      idempotencyKey,
+    });
+  },
+
+  writeOffDebt: (id: string, body: WriteOffDebtInput, idempotencyKey: string): Promise<DebtEnvelope> => {
+    const validBody = WriteOffDebtSchema.parse(body);
+    return http(`/finance/debts/${id}/write-off`, DebtEnvelopeSchema, {
+      method: 'POST',
+      body: validBody,
+      idempotencyKey,
+    });
+  },
+
+  debtRepayments: (debtId: string, signal?: AbortSignal): Promise<RepaymentListEnvelope> =>
+    http(`/finance/debts/${debtId}/repayments`, RepaymentListEnvelopeSchema, signalOf(signal)),
+
+  createDebtRepayment: (
+    debtId: string,
+    body: CreateRepaymentInput,
+    idempotencyKey: string,
+  ): Promise<RepaymentEnvelope> => {
+    const validBody = CreateRepaymentSchema.parse(body);
+    return http(`/finance/debts/${debtId}/repayments`, RepaymentEnvelopeSchema, {
+      method: 'POST',
+      body: validBody,
+      idempotencyKey,
+    });
+  },
+
+  deleteDebtRepayment: (debtId: string, repaymentId: string): Promise<void> =>
+    http(`/finance/debts/${debtId}/repayments/${repaymentId}`, NoContent, {
+      method: 'DELETE',
+    }),
 };

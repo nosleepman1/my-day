@@ -59,7 +59,7 @@ export type NavEntry = Readonly<{
   inMoreMenu: boolean;
 }>;
 
-export const CURRENT_PHASE = 5;
+export const CURRENT_PHASE = 6;
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
   { key: 'home', path: '/', icon: House, section: 'home', phase: 2, inMoreMenu: false },
