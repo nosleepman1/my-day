@@ -229,4 +229,23 @@ describe('security', () => {
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('renders error state on profile, modules and security pages when API fails', async () => {
+    mockSession();
+    server.use(
+      http.get('/api/v1/me', () => HttpResponse.json({ error: { code: 'SERVER_ERROR' } }, { status: 500 })),
+      http.get('/api/v1/me/preferences', () =>
+        HttpResponse.json({ error: { code: 'SERVER_ERROR' } }, { status: 500 }),
+      ),
+    );
+
+    const { router } = renderApp('/settings/profile');
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    await router.navigate('/settings/modules');
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    await router.navigate('/settings/security');
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
 });

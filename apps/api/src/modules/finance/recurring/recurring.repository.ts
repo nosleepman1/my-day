@@ -499,7 +499,8 @@ export class RecurringRepository {
         id: params.transactionId,
         userId: params.userId,
         type: params.type,
-        status: 'VALIDATED',
+        status: 'PENDING',
+        validatedAt: null,
         economicClass: params.economicClass,
         amountMinor: params.amountMinor,
         currency: params.currency,
@@ -530,6 +531,14 @@ export class RecurringRepository {
       await this.validateAccountsAndOverdraft(txClient, params);
       await this.createOccurrenceTransaction(txClient, params);
       await this.insertOccurrenceLedgerEntries(txClient, params);
+
+      await tx.transaction.update({
+        where: { userId_id: { userId: params.userId, id: params.transactionId } },
+        data: {
+          status: 'VALIDATED',
+          validatedAt: params.confirmedAt,
+        },
+      });
 
       return tx.recurringOccurrence.update({
         where: { userId_id: { userId: params.userId, id: params.occurrenceId } },

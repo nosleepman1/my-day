@@ -24,7 +24,7 @@ import {
 
 import { AuditService } from '../../../platform/audit/audit.service';
 import { DomainError } from '../../../platform/errors/domain-error';
-import type { CounterpartiesRepository } from '../counterparties/counterparties.repository';
+import { CounterpartiesRepository } from '../counterparties/counterparties.repository';
 import { computeDebtRemaining, deriveSettlementStatus, isDebtOverdue } from '../domain/debt-rules';
 import { FinanceContext } from '../shared/finance-context';
 

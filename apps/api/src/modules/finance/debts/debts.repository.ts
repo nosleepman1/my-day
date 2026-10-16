@@ -181,7 +181,8 @@ export class DebtsRepository {
         id: movement.transactionId,
         userId: params.userId,
         type: txType,
-        status: 'VALIDATED',
+        status: 'PENDING',
+        validatedAt: null,
         economicClass,
         amountMinor: params.principalMinor,
         currency: params.currency,
@@ -203,6 +204,14 @@ export class DebtsRepository {
         direction: entryDirection,
         amountMinor: params.principalMinor,
         currency: params.currency,
+      },
+    });
+
+    await tx.transaction.update({
+      where: { userId_id: { userId: params.userId, id: movement.transactionId } },
+      data: {
+        status: 'VALIDATED',
+        validatedAt: movement.occurredAt,
       },
     });
   }
@@ -391,17 +400,24 @@ export class DebtsRepository {
       await this.assertOverdraftForEntry(tx, params.userId, account, params.amountMinor);
     }
 
-    const txType = debt.type === 'PAYABLE' ? 'EXPENSE' : 'INCOME';
-    const economicClass = debt.type === 'PAYABLE' ? 'DEBT_REPAYMENT' : 'LOAN_COLLECTION';
-    const direction = debt.type === 'PAYABLE' ? 'DEBIT' : 'CREDIT';
+    await this.createValidatedRepaymentTransaction(tx, debt, params, valueDate);
+  }
 
+  private async createValidatedRepaymentTransaction(
+    tx: Prisma.TransactionClient,
+    debt: DebtWithRelations,
+    params: CreateRepaymentWithTxParams,
+    valueDate: Date,
+  ): Promise<void> {
+    const isPayable = debt.type === 'PAYABLE';
     await tx.transaction.create({
       data: {
         id: params.transactionId,
         userId: params.userId,
-        type: txType,
-        status: 'VALIDATED',
-        economicClass,
+        type: isPayable ? 'EXPENSE' : 'INCOME',
+        status: 'PENDING',
+        validatedAt: null,
+        economicClass: isPayable ? 'DEBT_REPAYMENT' : 'LOAN_COLLECTION',
         amountMinor: params.amountMinor,
         currency: debt.currency,
         occurredAt: params.occurredAt,
@@ -418,10 +434,15 @@ export class DebtsRepository {
         userId: params.userId,
         transactionId: params.transactionId,
         accountId: params.accountId,
-        direction,
+        direction: isPayable ? 'DEBIT' : 'CREDIT',
         amountMinor: params.amountMinor,
         currency: debt.currency,
       },
+    });
+
+    await tx.transaction.update({
+      where: { userId_id: { userId: params.userId, id: params.transactionId } },
+      data: { status: 'VALIDATED', validatedAt: params.occurredAt },
     });
   }
 

@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { EnvironmentBanner } from '@/components/environment-banner';
 
@@ -20,6 +20,29 @@ describe('web error reporting', () => {
   it('does not load the SDK without a DSN', async () => {
     await expect(initErrorReporting({})).resolves.toBe(false);
     await expect(initErrorReporting({ VITE_SENTRY_DSN: '' })).resolves.toBe(false);
+  });
+
+  it('initializes Sentry when DSN is provided', async () => {
+    const initMock = vi.fn();
+    vi.doMock('@sentry/react', () => ({
+      init: initMock,
+    }));
+
+    const result = await initErrorReporting({
+      VITE_SENTRY_DSN: 'https://key@sentry.example.com/123',
+      VITE_APP_ENV: 'staging',
+      VITE_APP_VERSION: 'v1.0.0',
+    });
+
+    expect(result).toBe(true);
+    expect(initMock).toHaveBeenCalledOnce();
+    const config = initMock.mock.calls[0]?.[0] as { beforeSend: (e: unknown) => unknown };
+    expect(config.beforeSend({ message: 'test' })).toEqual({ message: 'test' });
+
+    // Test default environment and release
+    await initErrorReporting({
+      VITE_SENTRY_DSN: 'https://key@sentry.example.com/123',
+    });
   });
 });
 

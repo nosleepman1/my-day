@@ -77,6 +77,8 @@ export default defineConfig({
         'src/cli/cli.ts',
         'src/**/*.module.ts',
         'src/**/*.port.ts',
+        'src/**/index.ts',
+        'src/**/*.dto.ts',
       ],
       thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
     },

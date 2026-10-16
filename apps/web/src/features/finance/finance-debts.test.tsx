@@ -39,6 +39,28 @@ describe('Finance - Dettes et créances (/finance/debts)', () => {
           currency: 'XOF',
           isOverdue: true,
         }),
+        debtFixture({
+          id: ID(52),
+          title: 'Dette réglée sans contrepartie',
+          type: 'PAYABLE',
+          principalMinor: '50000',
+          totalRepaidMinor: '50000',
+          remainingMinor: '0',
+          settlementStatus: 'SETTLED',
+          status: 'OPEN',
+          dueDate: null,
+          counterparty: undefined,
+        }),
+        debtFixture({
+          id: ID(54),
+          title: 'Créance radiée',
+          type: 'RECEIVABLE',
+          principalMinor: '100000',
+          totalRepaidMinor: '0',
+          remainingMinor: '100000',
+          status: 'WRITTEN_OFF',
+          dueDate: null,
+        }),
       ],
       debtSummary: debtSummaryFixture(),
     });
@@ -89,6 +111,18 @@ describe('Finance - Dettes et créances (/finance/debts)', () => {
     const amountInput = screen.getByLabelText('Montant initial');
     await user.clear(amountInput);
     await user.type(amountInput, '75000');
+
+    const dueDateInput = screen.getByLabelText("Date d'échéance (optionnelle)");
+    await user.type(dueDateInput, '2026-12-31');
+
+    const descInput = screen.getByLabelText('Description');
+    await user.type(descInput, 'Facture trimestrielle');
+
+    const initialCheck = screen.getByLabelText('Enregistrer le mouvement de trésorerie initial maintenant');
+    await user.click(initialCheck);
+
+    const accountSelect = await screen.findByLabelText('Compte bancaire / caisse');
+    await user.selectOptions(accountSelect, ID(1));
 
     const submitBtn = screen.getByRole('button', { name: 'Confirmer' });
     await user.click(submitBtn);
@@ -239,5 +273,28 @@ describe('Finance - Dettes et créances (/finance/debts)', () => {
 
     expect(await screen.findByText('Passée en perte')).toBeInTheDocument();
     expect(screen.getByText('Liquidation judiciaire du client')).toBeInTheDocument();
+  });
+
+  it('renders empty state when there are no debts and applies filters', async () => {
+    mockSession();
+    mockFinanceEndpoints({
+      debts: [],
+      debtSummary: debtSummaryFixture(),
+    });
+
+    const user = userEvent.setup();
+    renderApp('/finance/debts');
+
+    expect(await screen.findByRole('heading', { name: 'Dettes & Créances' })).toBeInTheDocument();
+    expect(await screen.findByText('Aucune dette ni créance')).toBeInTheDocument();
+
+    const cpFilter = screen.getByLabelText('Contrepartie');
+    await user.selectOptions(cpFilter, ID(30));
+
+    const statusFilter = screen.getByLabelText('Statut');
+    await user.selectOptions(statusFilter, 'CANCELLED');
+
+    const overdueFilter = screen.getByLabelText('En retard uniquement');
+    await user.click(overdueFilter);
   });
 });

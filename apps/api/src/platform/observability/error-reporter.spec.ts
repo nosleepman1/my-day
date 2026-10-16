@@ -38,4 +38,22 @@ describe('error reporter (INFRASTRUCTURE.md §12.4)', () => {
       reporter.capture(new Error('ignored'), { requestId: 'r' });
     }).not.toThrow();
   });
+
+  it('initializes Sentry and captures exceptions when DSN is provided', () => {
+    const reporter = createErrorReporter({
+      SENTRY_DSN: 'https://key@sentry.io/12345',
+      SENTRY_ENVIRONMENT: 'staging',
+      APP_ENV: 'development',
+      APP_VERSION: '1.2.3',
+    } as unknown as Env);
+
+    expect(reporter).not.toBe(NOOP_ERROR_REPORTER);
+    expect(() => {
+      reporter.capture(new Error('unhandled 500 error'), {
+        requestId: 'req-123',
+        code: 'UNEXPECTED_FAILURE',
+        userId: '0192f3a4-5b6c-7d8e-9f01-23456789abcd',
+      });
+    }).not.toThrow();
+  });
 });

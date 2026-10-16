@@ -11,7 +11,8 @@ import { FinanceContext } from '../shared/finance-context';
 import { toTransactionResponse } from '../transactions/transactions.service';
 
 import { TransferReferences } from './transfer-references';
-import type { TransferWithDetails, TransfersRepository } from './transfers.repository';
+import type { TransferWithDetails } from './transfers.repository';
+import { TransfersRepository } from './transfers.repository';
 
 export function toTransferResponse(tx: TransferWithDetails): TransferResponse {
   const debitEntry = tx.ledgerEntries.find((e) => e.direction === 'DEBIT');

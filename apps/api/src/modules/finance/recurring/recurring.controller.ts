@@ -106,6 +106,7 @@ export class RecurringController {
     @Query() query: ListOccurrencesQueryDto,
   ): Promise<RecurringOccurrenceListEnvelope> {
     const userId = this.tenant.requireUserId();
+    await this.recurring.getById(userId, params.id);
     if (query.to) {
       await this.recurring.materializeOccurrences(userId, params.id, query.to);
     }

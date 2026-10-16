@@ -77,17 +77,31 @@ describe('finance schema invariants (PHASE-05)', () => {
     amountMinor: bigint;
     currency?: string;
   }
-  const insertLedgerEntry = async (
+
+  const insertTransactionWithEntry = async (
     owner: string,
-    transactionId: string,
+    amountMinor: bigint,
     accountId: string,
-    opts: LedgerEntryOptions,
+    opts: TransactionOptions & Partial<LedgerEntryOptions> = {},
   ) => {
+    const id = opts.id ?? randomUUID();
     const currency = opts.currency ?? 'XOF';
-    await app.$executeRaw`
-      INSERT INTO ledger_entries (user_id, transaction_id, account_id, direction, amount_minor, currency)
-      VALUES (${owner}::uuid, ${transactionId}::uuid, ${accountId}::uuid, ${opts.direction}::entry_direction, ${opts.amountMinor}, ${currency})
-    `;
+    const type = opts.type ?? 'EXPENSE';
+    const status = opts.status ?? 'PENDING';
+    const economicClass = opts.economicClass ?? 'EXPENSE_OPERATING';
+    const direction = opts.direction ?? (type === 'INCOME' ? 'CREDIT' : 'DEBIT');
+    const entryId = randomUUID();
+    await app.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        INSERT INTO transactions (id, user_id, type, status, economic_class, amount_minor, currency, occurred_at, value_date, source)
+        VALUES (${id}::uuid, ${owner}::uuid, ${type}::transaction_type, ${status}::transaction_status, ${economicClass}::economic_class, ${amountMinor}, ${currency}, now(), '2026-10-15', 'MANUAL'::transaction_source)
+      `;
+      await tx.$executeRaw`
+        INSERT INTO ledger_entries (id, user_id, transaction_id, account_id, direction, amount_minor, currency)
+        VALUES (${entryId}::uuid, ${owner}::uuid, ${id}::uuid, ${accountId}::uuid, ${direction}::entry_direction, ${amountMinor}, ${currency})
+      `;
+    });
+    return id;
   };
 
   beforeAll(async () => {
@@ -132,20 +146,34 @@ describe('finance schema invariants (PHASE-05)', () => {
   describe('financial_accounts table', () => {
     it('enforces composite foreign keys preventing linking across users', async () => {
       const foreignAccount = await insertAccount(otherUserId);
-      const txId = await insertTransaction(userId, 1000n);
       await expect(
-        insertLedgerEntry(userId, txId, foreignAccount, { direction: 'DEBIT', amountMinor: 1000n }),
+        app.$transaction(async (tx) => {
+          const txId = randomUUID();
+          await tx.$executeRaw`
+            INSERT INTO transactions (id, user_id, type, status, economic_class, amount_minor, currency, occurred_at, value_date, source)
+            VALUES (${txId}::uuid, ${userId}::uuid, 'EXPENSE'::transaction_type, 'PENDING'::transaction_status, 'EXPENSE_OPERATING'::economic_class, 1000, 'XOF', now(), '2026-10-15', 'MANUAL'::transaction_source)
+          `;
+          await tx.$executeRaw`
+            INSERT INTO ledger_entries (id, user_id, transaction_id, account_id, direction, amount_minor, currency)
+            VALUES (${randomUUID()}::uuid, ${userId}::uuid, ${txId}::uuid, ${foreignAccount}::uuid, 'DEBIT'::entry_direction, 1000, 'XOF')
+          `;
+        }),
       ).rejects.toThrow(/foreign key|23503/i);
     });
 
     it('enforces currency match between account and ledger entry at the database level', async () => {
       const xofAccount = await insertAccount(userId, { currency: 'XOF' });
-      const eurTx = await insertTransaction(userId, 100n, { currency: 'EUR' });
       await expect(
-        insertLedgerEntry(userId, eurTx, xofAccount, {
-          direction: 'DEBIT',
-          amountMinor: 100n,
-          currency: 'EUR',
+        app.$transaction(async (tx) => {
+          const txId = randomUUID();
+          await tx.$executeRaw`
+            INSERT INTO transactions (id, user_id, type, status, economic_class, amount_minor, currency, occurred_at, value_date, source)
+            VALUES (${txId}::uuid, ${userId}::uuid, 'EXPENSE'::transaction_type, 'PENDING'::transaction_status, 'EXPENSE_OPERATING'::economic_class, 100, 'EUR', now(), '2026-10-15', 'MANUAL'::transaction_source)
+          `;
+          await tx.$executeRaw`
+            INSERT INTO ledger_entries (id, user_id, transaction_id, account_id, direction, amount_minor, currency)
+            VALUES (${randomUUID()}::uuid, ${userId}::uuid, ${txId}::uuid, ${xofAccount}::uuid, 'DEBIT'::entry_direction, 100, 'EUR')
+          `;
         }),
       ).rejects.toThrow(/foreign key|23503/i);
     });
@@ -168,8 +196,7 @@ describe('finance schema invariants (PHASE-05)', () => {
 
     it('protects opening_balance_minor immutability once ledger entries exist', async () => {
       const accountId = await insertAccount(userId, { currency: 'XOF' });
-      const txId = await insertTransaction(userId, 1000n);
-      await insertLedgerEntry(userId, txId, accountId, { direction: 'DEBIT', amountMinor: 1000n });
+      await insertTransactionWithEntry(userId, 1000n, accountId);
       await expect(
         app.$executeRaw`UPDATE financial_accounts SET opening_balance_minor = 500 WHERE id = ${accountId}::uuid`,
       ).rejects.toThrow(/opening_balance_minor is immutable once ledger entries exist/i);
@@ -197,21 +224,29 @@ describe('finance schema invariants (PHASE-05)', () => {
     it('rejects a non-positive amount on transactions and ledger entries', async () => {
       await expect(insertTransaction(userId, 0n)).rejects.toThrow(/ck_transactions__amount_positive/);
 
-      const txId = await insertTransaction(userId, 1000n);
       const accountId = await insertAccount(userId);
       await expect(
-        insertLedgerEntry(userId, txId, accountId, { direction: 'DEBIT', amountMinor: 0n }),
+        app.$transaction(async (tx) => {
+          const txId = randomUUID();
+          await tx.$executeRaw`
+            INSERT INTO transactions (id, user_id, type, status, economic_class, amount_minor, currency, occurred_at, value_date, source)
+            VALUES (${txId}::uuid, ${userId}::uuid, 'EXPENSE'::transaction_type, 'PENDING'::transaction_status, 'EXPENSE_OPERATING'::economic_class, 1000, 'XOF', now(), '2026-10-15', 'MANUAL'::transaction_source)
+          `;
+          await tx.$executeRaw`
+            INSERT INTO ledger_entries (id, user_id, transaction_id, account_id, direction, amount_minor, currency)
+            VALUES (${randomUUID()}::uuid, ${userId}::uuid, ${txId}::uuid, ${accountId}::uuid, 'DEBIT'::entry_direction, 0, 'XOF')
+          `;
+        }),
       ).rejects.toThrow(/ck_ledger_entries__amount_positive/);
     });
 
     it('forbids updating ledger_entries and only allows INSERT/DELETE when transaction is PENDING', async () => {
       const accountId = await insertAccount(userId);
-      const txId = await insertTransaction(userId, 1000n, {
+      const txId = await insertTransactionWithEntry(userId, 1000n, accountId, {
         currency: 'XOF',
         type: 'EXPENSE',
         status: 'PENDING',
       });
-      await insertLedgerEntry(userId, txId, accountId, { direction: 'DEBIT', amountMinor: 1000n });
 
       // UPDATE always forbidden on ledger_entries
       await expect(
@@ -228,7 +263,8 @@ describe('finance schema invariants (PHASE-05)', () => {
     });
 
     it('forbids hard DELETE of transactions in production', async () => {
-      const txId = await insertTransaction(userId, 1000n);
+      const accountId = await insertAccount(userId);
+      const txId = await insertTransactionWithEntry(userId, 1000n, accountId);
       await expect(app.$executeRaw`DELETE FROM transactions WHERE id = ${txId}::uuid`).rejects.toThrow(
         /hard delete of transactions is forbidden/i,
       );
@@ -245,7 +281,7 @@ describe('finance schema invariants (PHASE-05)', () => {
           `;
           // No ledger entry added -> should fail at commit!
         }),
-      ).rejects.toThrow(/trg_transactions__entries_shape|entries_shape/i);
+      ).rejects.toThrow(/trg_transactions__entries_shape|requires exactly 1 DEBIT ledger entry/i);
     });
   });
 
@@ -254,7 +290,8 @@ describe('finance schema invariants (PHASE-05)', () => {
       const noteId = randomUUID();
       await app.$executeRaw`INSERT INTO notes (id, user_id, content) VALUES (${noteId}::uuid, ${userId}::uuid, 'Note test')`;
 
-      const txId = await insertTransaction(userId, 1000n);
+      const accountId = await insertAccount(userId);
+      const txId = await insertTransactionWithEntry(userId, 1000n, accountId);
       const linkId = randomUUID();
       await app.$executeRaw`
         INSERT INTO note_links (id, user_id, note_id, transaction_id)

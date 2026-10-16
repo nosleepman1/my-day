@@ -11,9 +11,13 @@ afterEach(() => {
 });
 
 describe('Finance - Transactions list (/finance/transactions)', () => {
-  it('renders transactions list and quick navigation links', async () => {
+  it('renders transactions list with various statuses and applies filters', async () => {
     mockSession();
     mockFinanceEndpoints({
+      accounts: [
+        accountFixture({ id: ID(1), name: 'Compte Courant', currency: 'XOF' }),
+        accountFixture({ id: ID(2), name: 'Épargne', currency: 'XOF' }),
+      ],
       transactions: [
         transactionFixture({
           id: ID(10),
@@ -21,15 +25,57 @@ describe('Finance - Transactions list (/finance/transactions)', () => {
           amountMinor: '25000',
           currency: 'XOF',
           status: 'VALIDATED',
+          type: 'EXPENSE',
+        }),
+        transactionFixture({
+          id: ID(11),
+          description: 'Vente prestation',
+          amountMinor: '100000',
+          currency: 'XOF',
+          status: 'PENDING',
+          type: 'INCOME',
+        }),
+        transactionFixture({
+          id: ID(12),
+          description: null,
+          amountMinor: '50000',
+          currency: 'XOF',
+          status: 'CANCELLED',
+          type: 'TRANSFER',
         }),
       ],
+    });
+
+    const user = userEvent.setup();
+    renderApp('/finance/transactions');
+
+    expect(await screen.findByRole('heading', { name: 'Transactions' })).toBeInTheDocument();
+    expect(await screen.findByText('Abonnement Internet')).toBeInTheDocument();
+    expect(screen.getByText('Vente prestation')).toBeInTheDocument();
+    expect(screen.getAllByText('Validée').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('En attente').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Annulée').length).toBeGreaterThanOrEqual(1);
+
+    const typeSelect = screen.getByLabelText('Type');
+    await user.selectOptions(typeSelect, 'INCOME');
+
+    const statusSelect = screen.getByLabelText('Statut');
+    await user.selectOptions(statusSelect, 'PENDING');
+
+    const accountSelect = screen.getByLabelText('Compte');
+    await user.selectOptions(accountSelect, ID(1));
+  });
+
+  it('renders empty state when there are no transactions', async () => {
+    mockSession();
+    mockFinanceEndpoints({
+      transactions: [],
     });
 
     renderApp('/finance/transactions');
 
     expect(await screen.findByRole('heading', { name: 'Transactions' })).toBeInTheDocument();
-    expect(await screen.findByText('Abonnement Internet')).toBeInTheDocument();
-    expect(screen.getAllByText('Validée').length).toBeGreaterThan(0);
+    expect(await screen.findByText('Aucune transaction')).toBeInTheDocument();
   });
 });
 

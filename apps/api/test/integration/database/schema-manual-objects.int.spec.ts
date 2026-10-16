@@ -181,11 +181,13 @@ describe('manual SQL objects (prisma/manual-objects.md)', () => {
   });
 
   it('enforces a single ADMIN account', async () => {
+    await owner.$executeRaw`DELETE FROM users WHERE role = 'ADMIN'`;
     const insertAdmin = (id: string, email: string) =>
       owner.$executeRaw`INSERT INTO users (id, email, password_hash, display_name, role) VALUES (${id}::uuid, ${email}, 'x', 'Admin', 'ADMIN')`;
     await insertAdmin('0192f1c3-7a2b-7c1e-9d0f-3b4c5d6e7f90', 'admin-one@example.test');
     await expect(
       insertAdmin('0192f1c3-7a2b-7c1e-9d0f-3b4c5d6e7f91', 'admin-two@example.test'),
     ).rejects.toThrow(/23505|unique constraint/i);
+    await owner.$executeRaw`DELETE FROM users WHERE id = '0192f1c3-7a2b-7c1e-9d0f-3b4c5d6e7f90'::uuid`;
   });
 });

@@ -339,5 +339,61 @@ describe('ReportsService', () => {
       expect(res.debts).toBeDefined();
       expect(res.debts).toHaveLength(1);
     });
+
+    it('materializes active recurrences and projects recurring transfer to destination account', async () => {
+      mockCtx.db.financialAccount.findMany.mockResolvedValueOnce([
+        {
+          id: ACCOUNT_1,
+          name: 'Compte Épargne',
+          type: 'SAVINGS',
+          currency: 'XOF',
+          openingBalanceMinor: 10_000n,
+          archivedAt: null,
+        },
+      ]);
+      mockAccountsRepo.getClearedBalance.mockResolvedValueOnce({
+        clearedBalanceMinor: 10_000n,
+      });
+
+      mockCtx.db.recurringTransaction.findMany.mockResolvedValueOnce([
+        {
+          id: '01927000-0000-7000-8000-000000000080',
+          userId: USER_ID,
+          name: 'Virement Épargne',
+          type: 'TRANSFER',
+          amountMinor: 15_000n,
+          currency: 'XOF',
+          accountId: ACCOUNT_2,
+          destinationAccountId: ACCOUNT_1,
+          recurrenceRule: 'FREQ=MONTHLY;BYMONTHDAY=20',
+          recurrenceAnchorOn: new Date('2026-10-01T00:00:00.000Z'),
+        },
+      ]);
+
+      mockCtx.db.recurringOccurrence.findMany.mockResolvedValueOnce([
+        {
+          id: '01927000-0000-7000-8000-000000000085',
+          dueOn: new Date('2026-10-20T00:00:00.000Z'),
+          expectedAmountMinor: 15_000n,
+          status: 'EXPECTED',
+          createdAt: new Date('2026-10-01T00:00:00.000Z'),
+          recurringTransaction: {
+            id: '01927000-0000-7000-8000-000000000080',
+            type: 'TRANSFER',
+            accountId: ACCOUNT_2,
+            destinationAccountId: ACCOUNT_1,
+          },
+        },
+      ]);
+
+      const res = await service.getForecast({
+        horizon: 30,
+        currency: 'XOF',
+        accountId: ACCOUNT_1,
+      });
+
+      expect(mockCtx.db.recurringOccurrence.createMany).toHaveBeenCalled();
+      expect(res.accounts[0]?.projectedEndBalanceMinor).toBe('25000');
+    });
   });
 });

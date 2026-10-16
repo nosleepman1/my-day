@@ -27,15 +27,46 @@ describe('Finance - Récurrences (/finance/recurring)', () => {
           amountMinor: '25000',
           currency: 'XOF',
           status: 'ACTIVE',
+          type: 'EXPENSE',
+          nextOccurrenceAt: '2026-11-01T00:00:00.000Z',
+        }),
+        recurringFixture({
+          id: ID(102),
+          name: 'Salaire consultant',
+          amountMinor: '500000',
+          currency: 'XOF',
+          status: 'PAUSED',
+          type: 'INCOME',
+          nextOccurrenceAt: null,
+        }),
+        recurringFixture({
+          id: ID(103),
+          name: 'Épargne programmée',
+          amountMinor: '100000',
+          currency: 'XOF',
+          status: 'ENDED',
+          type: 'TRANSFER',
+          nextOccurrenceAt: null,
         }),
       ],
     });
 
+    const user = userEvent.setup();
     renderApp('/finance/recurring');
 
     expect(await screen.findByRole('heading', { name: 'Transactions récurrentes' })).toBeInTheDocument();
     expect(await screen.findByText('Abonnement Internet Fibre')).toBeInTheDocument();
+    expect(screen.getByText('Salaire consultant')).toBeInTheDocument();
+    expect(screen.getByText('Épargne programmée')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByText('En pause')).toBeInTheDocument();
+    expect(screen.getByText('Terminée')).toBeInTheDocument();
+
+    const pauseBtn = screen.getByRole('button', { name: 'Mettre en pause' });
+    await user.click(pauseBtn);
+
+    const [resumeBtn] = screen.getAllByRole('button', { name: 'Reprendre' });
+    await user.click(resumeBtn!);
   });
 
   it('creates a new recurring transaction via form', async () => {
@@ -61,6 +92,9 @@ describe('Finance - Récurrences (/finance/recurring)', () => {
     const amountInput = screen.getByLabelText('Montant');
     await user.clear(amountInput);
     await user.type(amountInput, '15000');
+
+    const freqSelect = screen.getByLabelText('Périodicité');
+    await user.selectOptions(freqSelect, 'MONTHLY');
 
     const submitBtn = screen.getByRole('button', { name: 'Confirmer' });
     await user.click(submitBtn);
@@ -253,5 +287,96 @@ describe('Finance - Prévisions (/finance/forecast)', () => {
 
     expect(await screen.findByRole('heading', { name: 'Prévisions de trésorerie' })).toBeInTheDocument();
     expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('updates forecast filters when changing horizon, account, and debts toggle', async () => {
+    mockSession();
+    mockFinanceEndpoints({
+      accounts: [
+        accountFixture({ id: ID(1), name: 'Compte 1', currency: 'XOF' }),
+        accountFixture({ id: ID(2), name: 'Compte 2', currency: 'EUR' }),
+      ],
+    });
+    mockRecurringAndForecastEndpoints({
+      forecast: forecastFixture({
+        accounts: [],
+      }),
+    });
+
+    const user = userEvent.setup();
+    renderApp('/finance/forecast');
+
+    expect(await screen.findByRole('heading', { name: 'Prévisions de trésorerie' })).toBeInTheDocument();
+    expect(await screen.findByText('Aucune projection disponible pour cet horizon.')).toBeInTheDocument();
+
+    const horizonSelect = screen.getByLabelText('Horizon temporel');
+    await user.selectOptions(horizonSelect, '60');
+    await user.selectOptions(horizonSelect, '90');
+
+    const accountSelect = screen.getByLabelText('Compte');
+    await user.selectOptions(accountSelect, ID(1));
+
+    const includeDebtsCheckbox = screen.getByLabelText('Inclure les échéances de dettes et créances');
+    await user.click(includeDebtsCheckbox);
+  });
+
+  it('allows skipping an occurrence from recurring detail page', async () => {
+    mockSession();
+    mockRecurringAndForecastEndpoints({
+      recurring: [
+        recurringFixture({
+          id: ID(102),
+          name: 'Serveur de sauvegarde',
+          status: 'ACTIVE',
+        }),
+      ],
+      occurrences: [
+        occurrenceFixture({
+          id: ID(202),
+          recurringTransactionId: ID(102),
+          status: 'EXPECTED',
+        }),
+      ],
+    });
+
+    const user = userEvent.setup();
+    renderApp(`/finance/recurring/${ID(102)}`);
+
+    expect(await screen.findByRole('heading', { name: 'Serveur de sauvegarde' })).toBeInTheDocument();
+
+    const skipBtn = await screen.findByRole('button', { name: 'Ignorer' });
+    await user.click(skipBtn);
+
+    expect(await screen.findByRole('heading', { name: 'Ignorer cette échéance' })).toBeInTheDocument();
+
+    const confirmSkipBtn = screen.getByRole('button', { name: 'Confirmer' });
+    await user.click(confirmSkipBtn);
+  });
+
+  it('renders empty state on /finance/recurring when there are no items', async () => {
+    mockSession();
+    mockRecurringAndForecastEndpoints({
+      recurring: [],
+    });
+
+    renderApp('/finance/recurring');
+
+    expect(await screen.findByRole('heading', { name: 'Transactions récurrentes' })).toBeInTheDocument();
+    expect(await screen.findByText('Aucune récurrence enregistrée')).toBeInTheDocument();
+  });
+
+  it('renders empty state on /finance/upcoming when there are no occurrences', async () => {
+    mockSession();
+    mockFinanceEndpoints({
+      accounts: [accountFixture({ id: ID(1), name: 'Compte Courant', currency: 'XOF' })],
+    });
+    mockRecurringAndForecastEndpoints({
+      occurrences: [],
+    });
+
+    renderApp('/finance/upcoming');
+
+    expect(await screen.findByRole('heading', { name: 'Échéances à venir' })).toBeInTheDocument();
+    expect(await screen.findByText('Aucune échéance à venir')).toBeInTheDocument();
   });
 });

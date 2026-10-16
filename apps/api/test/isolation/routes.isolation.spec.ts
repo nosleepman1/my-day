@@ -77,7 +77,9 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       .set(extraHeaders)
       .send(body)
       .expect((res) => {
-        if (res.status !== 200 && res.status !== 201) throw new Error(`${path} → ${res.status}`);
+        if (res.status !== 200 && res.status !== 201) {
+          throw new Error(`${path} → ${res.status}: ${JSON.stringify(res.body)}`);
+        }
       });
     return response.body.data.id as string;
   }
@@ -219,7 +221,7 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       `/finance/debts/${debt}/repayments`,
       {
         amountMinor: '10000',
-        paidOn: '2026-02-02',
+        date: '2026-02-02',
         accountId: account,
       },
       { 'Idempotency-Key': randomUUID() },
@@ -253,6 +255,9 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       .get(`/api/v1/finance/recurring/${recurring}/occurrences?to=2026-03-01`)
       .set(CSRF_HEADERS)
       .set('Cookie', owner.cookie);
+    if (occResponse.status !== 200) {
+      throw new Error(`GET occurrences failed ${occResponse.status}: ${JSON.stringify(occResponse.body)}`);
+    }
     const firstOcc = (occResponse.body as { data: { id: string }[] }).data[0];
     const occurrence = firstOcc ? firstOcc.id : SOME_ID;
     return { recurring, occurrence };
@@ -264,12 +269,14 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       type: 'BANK',
       currency: 'XOF',
       openedOn: '2026-01-01',
+      openingBalanceMinor: '500000',
     });
     const account2 = await createAs(owner, '/finance/accounts', {
       name: `Compte Dest ${randomUUID().slice(0, 8)}`,
       type: 'CASH',
       currency: 'XOF',
       openedOn: '2026-01-01',
+      openingBalanceMinor: '100000',
     });
     const category = await createAs(owner, '/finance/categories', {
       name: `Catégorie ${randomUUID().slice(0, 8)}`,
@@ -438,7 +445,7 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       {
         body: (f) => ({
           amountMinor: '5000',
-          paidOn: '2026-02-03',
+          date: '2026-02-03',
           accountId: f.account,
         }),
       },
@@ -498,6 +505,7 @@ describe('generated isolation harness (ADR-007, ADR-021, PHASE-01 T14)', () => {
       return agent[spec.verb](`/api/v1${spec.path(fixture)}`)
         .set(CSRF_HEADERS)
         .set('Cookie', intruder.cookie)
+        .set('Idempotency-Key', randomUUID())
         .send(spec.body?.(fixture) ?? {});
     };
   }

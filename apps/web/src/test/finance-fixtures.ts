@@ -682,58 +682,78 @@ function makeDebtRouteState(
   return { getDebts, setDebts, getRepayments, setRepayments };
 }
 
+interface FinanceStateHolders {
+  readonly getAccounts: () => AccountResponse[];
+  readonly setAccounts: (a: AccountResponse[]) => void;
+  readonly getTransactions: () => TransactionResponse[];
+  readonly setTransactions: (t: TransactionResponse[]) => void;
+  readonly getDebts: () => DebtResponse[];
+  readonly setDebts: (d: DebtResponse[]) => void;
+  readonly getRepayments: () => RepaymentResponse[];
+  readonly setRepayments: (r: RepaymentResponse[]) => void;
+}
+
+function createFinanceStateHolders(options: MockFinanceEndpointsOptions): FinanceStateHolders {
+  let accounts = [...(options.accounts ?? [accountFixture()])];
+  let transactions = [...(options.transactions ?? [transactionFixture()])];
+  let debts = [...(options.debts ?? [debtFixture()])];
+  let repayments = [...(options.repayments ?? [repaymentFixture()])];
+
+  return {
+    getAccounts: () => accounts,
+    setAccounts: (a) => {
+      accounts = a;
+    },
+    getTransactions: () => transactions,
+    setTransactions: (t) => {
+      transactions = t;
+    },
+    getDebts: () => debts,
+    setDebts: (d) => {
+      debts = d;
+    },
+    getRepayments: () => repayments,
+    setRepayments: (r) => {
+      repayments = r;
+    },
+  };
+}
+
+function wireAllRoutes(
+  holders: FinanceStateHolders,
+  balances: BalancesReport,
+  debtSummary: DebtSummaryResponse,
+): void {
+  registerCoreFinanceEndpoints(
+    { get: holders.getAccounts, set: holders.setAccounts },
+    { get: holders.getTransactions, set: holders.setTransactions },
+  );
+  registerFinanceAuxRoutes(balances);
+  const debtRouteState = makeDebtRouteState(
+    holders.getDebts,
+    holders.setDebts,
+    holders.getRepayments,
+    holders.setRepayments,
+  );
+  registerAllDebtRoutes(debtRouteState, () => debtSummary);
+}
+
 export function mockFinanceEndpoints(options: MockFinanceEndpointsOptions = {}): {
   getAccounts: () => AccountResponse[];
   getTransactions: () => TransactionResponse[];
   getDebts: () => DebtResponse[];
   getRepayments: () => RepaymentResponse[];
 } {
-  const {
-    accounts = [accountFixture()],
-    transactions = [transactionFixture()],
-    balances = balancesFixture(),
-    debts = [debtFixture()],
-    repayments = [repaymentFixture()],
-    debtSummary = debtSummaryFixture(),
-  } = options;
+  const holders = createFinanceStateHolders(options);
+  const balances = options.balances ?? balancesFixture();
+  const debtSummary = options.debtSummary ?? debtSummaryFixture();
 
-  let accountsState = [...accounts];
-  let transactionsState = [...transactions];
-  let debtsState = [...debts];
-  let repaymentsState = [...repayments];
-
-  registerCoreFinanceEndpoints(
-    {
-      get: () => accountsState,
-      set: (a) => {
-        accountsState = a;
-      },
-    },
-    {
-      get: () => transactionsState,
-      set: (t) => {
-        transactionsState = t;
-      },
-    },
-  );
-  registerFinanceAuxRoutes(balances);
-
-  const debtRouteState = makeDebtRouteState(
-    () => debtsState,
-    (d) => {
-      debtsState = d;
-    },
-    () => repaymentsState,
-    (r) => {
-      repaymentsState = r;
-    },
-  );
-  registerAllDebtRoutes(debtRouteState, () => debtSummary);
+  wireAllRoutes(holders, balances, debtSummary);
 
   return {
-    getAccounts: () => accountsState,
-    getTransactions: () => transactionsState,
-    getDebts: () => debtsState,
-    getRepayments: () => repaymentsState,
+    getAccounts: holders.getAccounts,
+    getTransactions: holders.getTransactions,
+    getDebts: holders.getDebts,
+    getRepayments: holders.getRepayments,
   };
 }

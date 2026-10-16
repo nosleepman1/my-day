@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { DomainError } from '../../../platform/errors/domain-error';
+import { encodeCursor } from '../../../platform/http/cursor';
 import type { FinanceContext } from '../shared/finance-context';
 
 import { CounterpartiesRepository } from './counterparties.repository';
@@ -138,10 +140,42 @@ describe('CounterpartiesRepository', () => {
     expect(page.nextCursor).toBeNull();
   });
 
+  it('lists counterparties with cursor and includeArchived=true', async () => {
+    const cursor = encodeCursor(['name', 'Alpha', CP_1]);
+    mockPrisma.counterparty.findMany.mockResolvedValueOnce([
+      sampleCounterparty,
+      { ...sampleCounterparty, id: CP_2 },
+    ]);
+
+    const page = await repo.list(USER_1, {
+      limit: 1,
+      cursor,
+      includeArchived: true,
+    });
+
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).toBeDefined();
+    expect(mockPrisma.counterparty.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.any(Array),
+        }),
+      }),
+    );
+  });
+
+  it('throws DomainError when cursor prefix is not name', async () => {
+    const badCursor = encodeCursor(['id', 'bad', CP_1]);
+    await expect(repo.list(USER_1, { limit: 10, cursor: badCursor })).rejects.toThrow(DomainError);
+  });
+
   it('updates counterparty fields', async () => {
     await repo.update(USER_1, CP_1, {
       name: 'Nouvelle Boulangerie',
       kind: 'ORGANIZATION',
+      phone: '+221780000000',
+      email: 'new@boulangerie.sn',
+      notes: 'Notes à jour',
     });
 
     expect(mockPrisma.counterparty.update).toHaveBeenCalledWith({
@@ -149,6 +183,9 @@ describe('CounterpartiesRepository', () => {
       data: {
         name: 'Nouvelle Boulangerie',
         kind: 'ORGANIZATION',
+        phone: '+221780000000',
+        email: 'new@boulangerie.sn',
+        notes: 'Notes à jour',
       },
       include: { _count: { select: { transactions: true } } },
     });

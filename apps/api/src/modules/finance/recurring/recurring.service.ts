@@ -14,7 +14,6 @@ import type {
 import {
   ConfirmOccurrenceSchema,
   CreateRecurringTransactionSchema,
-  ListOccurrencesQuerySchema,
   ListRecurringTransactionsQuerySchema,
   SkipOccurrenceSchema,
   UpdateRecurringTransactionSchema,
@@ -445,10 +444,17 @@ export class RecurringService {
 
   async listOccurrences(
     userId: string,
-    rawQuery: ListOccurrencesQuery,
+    query: ListOccurrencesQuery,
   ): Promise<{ items: RecurringOccurrenceResponse[]; nextCursor?: string }> {
-    const query = ListOccurrencesQuerySchema.parse(rawQuery);
-    const { items, nextCursor } = await this.repo.listOccurrences(userId, query);
+    const { items, nextCursor } = await this.repo.listOccurrences(userId, {
+      from: query.from,
+      to: query.to,
+      status: query.status,
+      recurringTransactionId: query.recurringTransactionId,
+      accountId: query.accountId,
+      limit: query.limit,
+      cursor: query.cursor,
+    });
     const todayCivil = this.getTodayCivil();
     return {
       items: items.map((item) => toOccurrenceResponse(item, todayCivil)),

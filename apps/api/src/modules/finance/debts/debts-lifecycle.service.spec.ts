@@ -160,6 +160,14 @@ describe('DebtsService - Lifecycle & Summary (Task 6)', () => {
       );
     });
 
+    it('refuses cancellation when debt does not exist', async () => {
+      mockRepo.findById.mockResolvedValue(null);
+
+      await expect(service.cancel(USER_1, DEBT_PAYABLE, { closingReason: 'Erreur' })).rejects.toThrow(
+        DomainError,
+      );
+    });
+
     it('refuses cancellation when debt is already closed', async () => {
       mockRepo.findById.mockResolvedValue({
         ...samplePayableDebt,
@@ -173,6 +181,25 @@ describe('DebtsService - Lifecycle & Summary (Task 6)', () => {
   });
 
   describe('writeOffDebt', () => {
+    it('refuses write-off when debt does not exist', async () => {
+      mockRepo.findById.mockResolvedValue(null);
+
+      await expect(service.writeOff(USER_1, DEBT_RECEIVABLE, { closingReason: 'Défaut' })).rejects.toThrow(
+        DomainError,
+      );
+    });
+
+    it('refuses write-off when debt is not OPEN', async () => {
+      mockRepo.findById.mockResolvedValue({
+        ...sampleReceivableDebt,
+        status: 'PAID',
+      });
+
+      await expect(service.writeOff(USER_1, DEBT_RECEIVABLE, { closingReason: 'Défaut' })).rejects.toThrow(
+        DomainError,
+      );
+    });
+
     it('writes off open receivable debt and records audit log', async () => {
       mockRepo.findById.mockResolvedValue(sampleReceivableDebt);
       const writtenOffDebt: DebtWithRelations = {

@@ -2,6 +2,7 @@ import { http as mswHttp, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { preferences, sessionUser } from '@/test/api-fixtures';
 import { server } from '@/test/msw-server';
 
 import { ApiError, ContractError, http, NetworkError } from './client';
@@ -102,5 +103,19 @@ describe('http client (FRONTEND.md §3)', () => {
     );
     expect(error).not.toBeInstanceOf(NetworkError);
     expect(error).toMatchObject({ name: 'AbortError' });
+  });
+
+  it('calls sessionApi.me and sessionApi.preferences with and without AbortSignal', async () => {
+    const { sessionApi } = await import('./session.api');
+    server.use(
+      mswHttp.get('/api/v1/me', () => HttpResponse.json({ data: sessionUser() })),
+      mswHttp.get('/api/v1/me/preferences', () => HttpResponse.json({ data: preferences() })),
+    );
+
+    const controller = new AbortController();
+    await expect(sessionApi.me()).resolves.toBeDefined();
+    await expect(sessionApi.me(controller.signal)).resolves.toBeDefined();
+    await expect(sessionApi.preferences()).resolves.toBeDefined();
+    await expect(sessionApi.preferences(controller.signal)).resolves.toBeDefined();
   });
 });

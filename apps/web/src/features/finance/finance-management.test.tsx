@@ -1,9 +1,11 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mockSession } from '@/test/api-fixtures';
 import { accountFixture, ID, mockFinanceEndpoints } from '@/test/finance-fixtures';
+import { server } from '@/test/msw-server';
 import { renderApp } from '@/test/render';
 
 afterEach(() => {
@@ -134,6 +136,12 @@ describe('Finance - Reports (/finance/reports)', () => {
     await user.click(breakdownTab);
     expect(await screen.findByText('Alimentation')).toBeInTheDocument();
 
+    const incomeBtn = screen.getByRole('button', { name: 'Catégories de revenus' });
+    await user.click(incomeBtn);
+
+    const expenseBtn = screen.getByRole('button', { name: 'Catégories de dépenses' });
+    await user.click(expenseBtn);
+
     const balancesTab = screen.getByRole('button', { name: 'Soldes' });
     await user.click(balancesTab);
     expect(await screen.findByText('Wave Principal')).toBeInTheDocument();
@@ -141,5 +149,41 @@ describe('Finance - Reports (/finance/reports)', () => {
     const cashflowTab = screen.getByRole('button', { name: 'Flux de trésorerie' });
     await user.click(cashflowTab);
     expect(await screen.findByText('2026-10')).toBeInTheDocument();
+  });
+
+  it('renders empty report states when reports are empty', async () => {
+    mockSession();
+    mockFinanceEndpoints();
+    server.use(
+      http.get('/api/v1/finance/reports/summary', () =>
+        HttpResponse.json({
+          data: {
+            period: { from: '2026-10-01', to: '2026-10-31' },
+            summaries: [],
+          },
+        }),
+      ),
+      http.get('/api/v1/finance/reports/by-category', () =>
+        HttpResponse.json({
+          data: {
+            period: { fromDate: '2026-10-01', toDate: '2026-10-31' },
+            currency: 'XOF',
+            kind: 'EXPENSE',
+            totalMinor: '0',
+            categories: [],
+          },
+        }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    renderApp('/finance/reports');
+
+    expect(await screen.findByRole('heading', { name: 'Rapports financiers' })).toBeInTheDocument();
+    expect(await screen.findByText('Aucune donnée financière pour cette période.')).toBeInTheDocument();
+
+    const breakdownTab = screen.getByRole('button', { name: 'Par catégorie' });
+    await user.click(breakdownTab);
+    expect(await screen.findByText('Aucune donnée financière pour cette période.')).toBeInTheDocument();
   });
 });

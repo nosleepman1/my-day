@@ -21,6 +21,12 @@ describe('RecurringService (Task 7)', () => {
     list: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     updateStatus: ReturnType<typeof vi.fn>;
+    findOccurrenceById: ReturnType<typeof vi.fn>;
+    listOccurrences: ReturnType<typeof vi.fn>;
+    createOccurrencesBatch: ReturnType<typeof vi.fn>;
+    attachOccurrenceTransaction: ReturnType<typeof vi.fn>;
+    skipOccurrence: ReturnType<typeof vi.fn>;
+    confirmOccurrenceWithTransaction: ReturnType<typeof vi.fn>;
   };
   let mockCtx: {
     newId: ReturnType<typeof vi.fn>;
@@ -29,6 +35,8 @@ describe('RecurringService (Task 7)', () => {
       financialAccount: { findFirst: ReturnType<typeof vi.fn> };
       transactionCategory: { findFirst: ReturnType<typeof vi.fn> };
       counterparty: { findFirst: ReturnType<typeof vi.fn> };
+      transaction: { findFirst: ReturnType<typeof vi.fn> };
+      debtRepayment: { findFirst: ReturnType<typeof vi.fn> };
     };
   };
   let mockAudit: {
@@ -81,6 +89,12 @@ describe('RecurringService (Task 7)', () => {
       list: vi.fn(),
       update: vi.fn(),
       updateStatus: vi.fn(),
+      findOccurrenceById: vi.fn(),
+      listOccurrences: vi.fn(),
+      createOccurrencesBatch: vi.fn(),
+      attachOccurrenceTransaction: vi.fn(),
+      skipOccurrence: vi.fn(),
+      confirmOccurrenceWithTransaction: vi.fn(),
     };
     mockCtx = {
       newId: vi.fn(() => RECURRING_1),
@@ -89,6 +103,8 @@ describe('RecurringService (Task 7)', () => {
         financialAccount: { findFirst: vi.fn().mockResolvedValue(sampleAccount) },
         transactionCategory: { findFirst: vi.fn().mockResolvedValue({ id: CATEGORY_1, userId: USER_1 }) },
         counterparty: { findFirst: vi.fn().mockResolvedValue({ id: COUNTERPARTY_1, userId: USER_1 }) },
+        transaction: { findFirst: vi.fn().mockResolvedValue(null) },
+        debtRepayment: { findFirst: vi.fn().mockResolvedValue(null) },
       },
     };
     mockAudit = { record: vi.fn().mockResolvedValue(undefined) };
@@ -253,6 +269,187 @@ describe('RecurringService (Task 7)', () => {
           entityId: RECURRING_1,
         }),
       );
+    });
+  });
+
+  describe('occurrences', () => {
+    const OCCURRENCE_1 = '01927000-0000-7000-8000-000000000050';
+    const TX_1 = '01927000-0000-7000-8000-000000000060';
+
+    const sampleOccurrence = {
+      id: OCCURRENCE_1,
+      userId: USER_1,
+      recurringTransactionId: RECURRING_1,
+      dueOn: new Date('2026-11-05T00:00:00.000Z'),
+      expectedAmountMinor: 25_000n,
+      currency: 'XOF',
+      status: 'PLANNED' as const,
+      transactionId: null,
+      confirmedAt: null,
+      skippedAt: null,
+      createdAt: new Date('2026-10-01T10:00:00.000Z'),
+      recurringTransaction: {
+        id: RECURRING_1,
+        name: 'Abonnement Internet',
+        type: 'EXPENSE' as const,
+        economicClass: 'EXPENSE_OPERATING' as const,
+        accountId: ACCOUNT_1,
+      },
+    };
+
+    it('lists occurrences via repo', async () => {
+      mockRepo.listOccurrences.mockResolvedValue({ items: [sampleOccurrence] });
+      const res = await service.listOccurrences(USER_1, { limit: 10 });
+      expect(res.items).toHaveLength(1);
+    });
+
+    it('confirms occurrence by generating new transaction', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue(sampleOccurrence);
+      mockRepo.confirmOccurrenceWithTransaction.mockResolvedValue({
+        ...sampleOccurrence,
+        status: 'CONFIRMED',
+        transactionId: TX_1,
+        confirmedAt: new Date('2026-02-01T10:00:00.000Z'),
+      });
+
+      const res = await service.confirmOccurrence(USER_1, OCCURRENCE_1, {});
+      expect(res.status).toBe('CONFIRMED');
+      expect(mockRepo.confirmOccurrenceWithTransaction).toHaveBeenCalled();
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'finance.recurring.occurrence_confirm' }),
+      );
+    });
+
+    it('confirms occurrence by attaching an existing transaction', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue(sampleOccurrence);
+      mockCtx.db.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'VALIDATED',
+        currency: 'XOF',
+        amountMinor: 25_000n,
+      });
+      mockRepo.attachOccurrenceTransaction.mockResolvedValue({
+        ...sampleOccurrence,
+        status: 'CONFIRMED',
+        transactionId: TX_1,
+        confirmedAt: new Date('2026-02-01T10:00:00.000Z'),
+      });
+
+      const res = await service.confirmOccurrence(USER_1, OCCURRENCE_1, { transactionId: TX_1 });
+      expect(res.status).toBe('CONFIRMED');
+      expect(mockRepo.attachOccurrenceTransaction).toHaveBeenCalled();
+    });
+
+    it('throws NOT_FOUND if attached transaction does not exist', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue(sampleOccurrence);
+      mockCtx.db.transaction.findFirst.mockResolvedValue(null);
+
+      await expect(service.confirmOccurrence(USER_1, OCCURRENCE_1, { transactionId: TX_1 })).rejects.toThrow(
+        DomainError,
+      );
+    });
+
+    it('throws BUSINESS_RULE_VIOLATION if attached transaction is not VALIDATED', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue(sampleOccurrence);
+      mockCtx.db.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'PENDING',
+        currency: 'XOF',
+        amountMinor: 25_000n,
+      });
+
+      await expect(service.confirmOccurrence(USER_1, OCCURRENCE_1, { transactionId: TX_1 })).rejects.toThrow(
+        DomainError,
+      );
+    });
+
+    it('throws CURRENCY_MISMATCH if transaction currency differs', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue(sampleOccurrence);
+      mockCtx.db.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'VALIDATED',
+        currency: 'EUR',
+        amountMinor: 25_000n,
+      });
+
+      await expect(service.confirmOccurrence(USER_1, OCCURRENCE_1, { transactionId: TX_1 })).rejects.toThrow(
+        DomainError,
+      );
+    });
+
+    it('throws BUSINESS_RULE_VIOLATION if transaction already attached to a repayment', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue(sampleOccurrence);
+      mockCtx.db.transaction.findFirst.mockResolvedValue({
+        id: TX_1,
+        userId: USER_1,
+        status: 'VALIDATED',
+        currency: 'XOF',
+        amountMinor: 25_000n,
+      });
+      mockCtx.db.debtRepayment.findFirst.mockResolvedValue({ id: 'repayment_id' });
+
+      await expect(service.confirmOccurrence(USER_1, OCCURRENCE_1, { transactionId: TX_1 })).rejects.toThrow(
+        DomainError,
+      );
+    });
+
+    it('returns idempotently if occurrence already confirmed', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue({
+        ...sampleOccurrence,
+        status: 'CONFIRMED',
+      });
+
+      const res = await service.confirmOccurrence(USER_1, OCCURRENCE_1, {});
+      expect(res.status).toBe('CONFIRMED');
+      expect(mockRepo.confirmOccurrenceWithTransaction).not.toHaveBeenCalled();
+    });
+
+    it('throws INVALID_STATE_TRANSITION if confirming SKIPPED occurrence', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue({
+        ...sampleOccurrence,
+        status: 'SKIPPED',
+      });
+
+      await expect(service.confirmOccurrence(USER_1, OCCURRENCE_1, {})).rejects.toThrow(DomainError);
+    });
+
+    it('skips planned occurrence', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue(sampleOccurrence);
+      mockRepo.skipOccurrence.mockResolvedValue({
+        ...sampleOccurrence,
+        status: 'SKIPPED',
+        skippedAt: new Date('2026-02-01T10:00:00.000Z'),
+      });
+
+      const res = await service.skipOccurrence(USER_1, OCCURRENCE_1, { reason: 'Vacances' });
+      expect(res.status).toBe('SKIPPED');
+      expect(mockRepo.skipOccurrence).toHaveBeenCalled();
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'finance.recurring.occurrence_skip' }),
+      );
+    });
+
+    it('returns idempotently if occurrence already skipped', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue({
+        ...sampleOccurrence,
+        status: 'SKIPPED',
+      });
+
+      const res = await service.skipOccurrence(USER_1, OCCURRENCE_1, {});
+      expect(res.status).toBe('SKIPPED');
+      expect(mockRepo.skipOccurrence).not.toHaveBeenCalled();
+    });
+
+    it('throws INVALID_STATE_TRANSITION if skipping confirmed occurrence', async () => {
+      mockRepo.findOccurrenceById.mockResolvedValue({
+        ...sampleOccurrence,
+        status: 'CONFIRMED',
+      });
+
+      await expect(service.skipOccurrence(USER_1, OCCURRENCE_1, {})).rejects.toThrow(DomainError);
     });
   });
 });
