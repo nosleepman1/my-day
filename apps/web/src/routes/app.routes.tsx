@@ -18,6 +18,7 @@ import {
   DebtFormPage,
   DebtsPage,
   FinanceOverviewPage,
+  ForecastPage,
   HomePage,
   IdeaDetailPage,
   IdeasPage,
@@ -29,6 +30,9 @@ import {
   ProfilePage,
   ProjectDetailPage,
   ProjectsPage,
+  RecurringDetailPage,
+  RecurringFormPage,
+  RecurringPage,
   ReportsPage,
   SecurityPage,
   SettingsLayout,
@@ -40,6 +44,7 @@ import {
   TransactionFormPage,
   TransactionsPage,
   TransferFormPage,
+  UpcomingOccurrencesPage,
 } from './lazy-pages';
 
 /** Finances (PHASE-05) : chaque écran est gardé par son module (`enabled_modules`, ADR-024). */
@@ -80,6 +85,16 @@ const financeRoutes: RouteObject[] = [
           { path: ':id', element: <DebtDetailPage /> },
         ],
       },
+      {
+        path: 'recurring',
+        children: [
+          { index: true, element: <RecurringPage /> },
+          { path: 'new', element: <RecurringFormPage /> },
+          { path: ':id', element: <RecurringDetailPage /> },
+        ],
+      },
+      { path: 'upcoming', element: <UpcomingOccurrencesPage /> },
+      { path: 'forecast', element: <ForecastPage /> },
     ],
   },
 ];

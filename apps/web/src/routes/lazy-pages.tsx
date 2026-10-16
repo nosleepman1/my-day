@@ -90,6 +90,17 @@ export const ReportsPage = lazy(() => finance().then((module) => ({ default: mod
 export const DebtsPage = lazy(() => finance().then((module) => ({ default: module.DebtsPage })));
 export const DebtFormPage = lazy(() => finance().then((module) => ({ default: module.DebtFormPage })));
 export const DebtDetailPage = lazy(() => finance().then((module) => ({ default: module.DebtDetailPage })));
+export const RecurringPage = lazy(() => finance().then((module) => ({ default: module.RecurringPage })));
+export const RecurringFormPage = lazy(() =>
+  finance().then((module) => ({ default: module.RecurringFormPage })),
+);
+export const RecurringDetailPage = lazy(() =>
+  finance().then((module) => ({ default: module.RecurringDetailPage })),
+);
+export const UpcomingOccurrencesPage = lazy(() =>
+  finance().then((module) => ({ default: module.UpcomingOccurrencesPage })),
+);
+export const ForecastPage = lazy(() => finance().then((module) => ({ default: module.ForecastPage })));
 
 /** Écran de démarrage pendant le chargement d'une page hors shell (publique ou onboarding). */
 export function Suspended({ children }: Readonly<{ children: ReactNode }>): JSX.Element {

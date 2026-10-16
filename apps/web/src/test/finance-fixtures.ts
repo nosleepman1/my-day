@@ -658,6 +658,12 @@ function registerCoreFinanceEndpoints(
   registerTransferMutation(transactionsState.get, transactionsState.set);
 }
 
+function registerAllDebtRoutes(state: DebtRouteState, getSummary: () => DebtSummaryResponse): void {
+  registerDebtQueryRoutes(state.getDebts, getSummary);
+  registerDebtMutationRoutes(state);
+  registerRepaymentRoutes(state);
+}
+
 export function mockFinanceEndpoints({
   accounts = [accountFixture()],
   transactions = [transactionFixture()],
@@ -709,12 +715,7 @@ export function mockFinanceEndpoints({
       repaymentsState = r;
     },
   };
-  registerDebtQueryRoutes(
-    () => debtsState,
-    () => debtSummary,
-  );
-  registerDebtMutationRoutes(debtRouteState);
-  registerRepaymentRoutes(debtRouteState);
+  registerAllDebtRoutes(debtRouteState, () => debtSummary);
 
   return {
     getAccounts: () => accountsState,

@@ -12,6 +12,7 @@ import {
   CategoryEnvelopeSchema,
   CategoryListEnvelopeSchema,
   CloseAccountSchema,
+  ConfirmOccurrenceSchema,
   ConfirmReconciliationSchema,
   CounterpartyEnvelopeSchema,
   CounterpartyListEnvelopeSchema,
@@ -19,6 +20,7 @@ import {
   CreateCategorySchema,
   CreateCounterpartySchema,
   CreateDebtSchema,
+  CreateRecurringTransactionSchema,
   CreateRepaymentSchema,
   CreateTransactionSchema,
   CreateTransferSchema,
@@ -26,11 +28,17 @@ import {
   DebtListEnvelopeSchema,
   DebtSummaryEnvelopeSchema,
   FinanceSummaryEnvelopeSchema,
+  ForecastReportEnvelopeSchema,
   ReconciliationResultEnvelopeSchema,
   ReconciliationStatusEnvelopeSchema,
+  RecurringOccurrenceEnvelopeSchema,
+  RecurringOccurrenceListEnvelopeSchema,
+  RecurringTransactionEnvelopeSchema,
+  RecurringTransactionListEnvelopeSchema,
   ReopenAccountSchema,
   RepaymentEnvelopeSchema,
   RepaymentListEnvelopeSchema,
+  SkipOccurrenceSchema,
   TransactionEnvelopeSchema,
   TransactionListEnvelopeSchema,
   TransferEnvelopeSchema,
@@ -38,6 +46,7 @@ import {
   UpdateCategorySchema,
   UpdateCounterpartySchema,
   UpdateDebtSchema,
+  UpdateRecurringTransactionSchema,
   UpdateTransactionDetailsSchema,
   WriteOffDebtSchema,
   type AccountAdjustmentInput,
@@ -53,6 +62,7 @@ import {
   type CategoryBreakdownQuery,
   type CategoryEnvelope,
   type CategoryListEnvelope,
+  type ConfirmOccurrenceInput,
   type ConfirmReconciliation,
   type CounterpartyEnvelope,
   type CounterpartyListEnvelope,
@@ -60,6 +70,7 @@ import {
   type CreateCategory,
   type CreateCounterparty,
   type CreateDebtInput,
+  type CreateRecurringTransactionInput,
   type CreateRepaymentInput,
   type CreateTransactionInput,
   type CreateTransferInput,
@@ -68,16 +79,25 @@ import {
   type DebtSummaryEnvelope,
   type FinanceSummaryEnvelope,
   type FinanceSummaryQuery,
+  type ForecastQuery,
+  type ForecastReportEnvelope,
   type ListAccountsQuery,
   type ListCategoriesQuery,
   type ListCounterpartiesQuery,
   type ListDebtsQuery,
+  type ListOccurrencesQuery,
+  type ListRecurringTransactionsQuery,
   type ListTransactionsQuery,
   type ReconciliationQuery,
   type ReconciliationResultEnvelope,
   type ReconciliationStatusEnvelope,
+  type RecurringOccurrenceEnvelope,
+  type RecurringOccurrenceListEnvelope,
+  type RecurringTransactionEnvelope,
+  type RecurringTransactionListEnvelope,
   type RepaymentEnvelope,
   type RepaymentListEnvelope,
+  type SkipOccurrenceInput,
   type TransactionEnvelope,
   type TransactionListEnvelope,
   type TransferEnvelope,
@@ -85,6 +105,7 @@ import {
   type UpdateCategory,
   type UpdateCounterparty,
   type UpdateDebt,
+  type UpdateRecurringTransaction,
   type UpdateTransactionDetails,
   type WriteOffDebtInput,
 } from '@orbit/contracts';
@@ -384,4 +405,92 @@ export const financeApi = {
     http(`/finance/debts/${debtId}/repayments/${repaymentId}`, NoContent, {
       method: 'DELETE',
     }),
+
+  // --- Récurrences ---
+  recurringTransactions: (
+    params?: Partial<ListRecurringTransactionsQuery>,
+    signal?: AbortSignal,
+  ): Promise<RecurringTransactionListEnvelope> =>
+    http(
+      `/finance/recurring${queryString(params as unknown as ListParams)}`,
+      RecurringTransactionListEnvelopeSchema,
+      signalOf(signal),
+    ),
+
+  recurringTransaction: (id: string, signal?: AbortSignal): Promise<RecurringTransactionEnvelope> =>
+    http(`/finance/recurring/${id}`, RecurringTransactionEnvelopeSchema, signalOf(signal)),
+
+  createRecurringTransaction: (
+    body: CreateRecurringTransactionInput,
+    idempotencyKey: string,
+  ): Promise<RecurringTransactionEnvelope> => {
+    const validBody = CreateRecurringTransactionSchema.parse(body);
+    return http('/finance/recurring', RecurringTransactionEnvelopeSchema, {
+      method: 'POST',
+      body: validBody,
+      idempotencyKey,
+    });
+  },
+
+  updateRecurringTransaction: (
+    id: string,
+    body: UpdateRecurringTransaction,
+  ): Promise<RecurringTransactionEnvelope> => {
+    const validBody = UpdateRecurringTransactionSchema.parse(body);
+    return http(`/finance/recurring/${id}`, RecurringTransactionEnvelopeSchema, {
+      method: 'PATCH',
+      body: validBody,
+    });
+  },
+
+  pauseRecurring: (id: string): Promise<RecurringTransactionEnvelope> =>
+    http(`/finance/recurring/${id}/pause`, RecurringTransactionEnvelopeSchema, { method: 'POST' }),
+
+  resumeRecurring: (id: string): Promise<RecurringTransactionEnvelope> =>
+    http(`/finance/recurring/${id}/resume`, RecurringTransactionEnvelopeSchema, { method: 'POST' }),
+
+  recurringOccurrences: (id: string, signal?: AbortSignal): Promise<RecurringOccurrenceListEnvelope> =>
+    http(`/finance/recurring/${id}/occurrences`, RecurringOccurrenceListEnvelopeSchema, signalOf(signal)),
+
+  occurrences: (
+    params?: Partial<ListOccurrencesQuery>,
+    signal?: AbortSignal,
+  ): Promise<RecurringOccurrenceListEnvelope> =>
+    http(
+      `/finance/recurring/occurrences${queryString(params as unknown as ListParams)}`,
+      RecurringOccurrenceListEnvelopeSchema,
+      signalOf(signal),
+    ),
+
+  confirmOccurrence: (
+    occurrenceId: string,
+    body: ConfirmOccurrenceInput,
+    idempotencyKey: string,
+  ): Promise<RecurringOccurrenceEnvelope> => {
+    const validBody = ConfirmOccurrenceSchema.parse(body);
+    return http(`/finance/recurring/occurrences/${occurrenceId}/confirm`, RecurringOccurrenceEnvelopeSchema, {
+      method: 'POST',
+      body: validBody,
+      idempotencyKey,
+    });
+  },
+
+  skipOccurrence: (
+    occurrenceId: string,
+    body?: SkipOccurrenceInput,
+  ): Promise<RecurringOccurrenceEnvelope> => {
+    const validBody = body ? SkipOccurrenceSchema.parse(body) : {};
+    return http(`/finance/recurring/occurrences/${occurrenceId}/skip`, RecurringOccurrenceEnvelopeSchema, {
+      method: 'POST',
+      body: validBody,
+    });
+  },
+
+  // --- Prévisions ---
+  forecast: (params?: Partial<ForecastQuery>, signal?: AbortSignal): Promise<ForecastReportEnvelope> =>
+    http(
+      `/finance/reports/forecast${queryString(params as unknown as ListParams)}`,
+      ForecastReportEnvelopeSchema,
+      signalOf(signal),
+    ),
 };

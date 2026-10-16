@@ -23,13 +23,20 @@ import type {
   DebtSummaryEnvelope,
   FinanceSummaryEnvelope,
   FinanceSummaryQuery,
+  ForecastQuery,
+  ForecastReportEnvelope,
   ListAccountsQuery,
   ListCategoriesQuery,
   ListCounterpartiesQuery,
   ListDebtsQuery,
+  ListOccurrencesQuery,
+  ListRecurringTransactionsQuery,
   ListTransactionsQuery,
   ReconciliationQuery,
   ReconciliationStatusEnvelope,
+  RecurringOccurrenceListEnvelope,
+  RecurringTransactionEnvelope,
+  RecurringTransactionListEnvelope,
   RepaymentListEnvelope,
   TransactionEnvelope,
   TransactionListEnvelope,
@@ -190,6 +197,61 @@ export function useFinanceDebtRepayments(
     queryKey: financeKeys.debtRepayments(debtId),
     queryFn: ({ signal }) => financeApi.debtRepayments(debtId, signal),
     enabled: enabled && debtId !== '',
+  });
+}
+
+export function useFinanceRecurringTransactions(
+  params?: Partial<ListRecurringTransactionsQuery>,
+  enabled = true,
+): UseQueryResult<RecurringTransactionListEnvelope> {
+  return useQuery({
+    queryKey: financeKeys.recurringTransactions(params as unknown as Record<string, string | undefined>),
+    queryFn: ({ signal }) => financeApi.recurringTransactions(params, signal),
+    enabled,
+  });
+}
+
+export function useFinanceRecurringTransaction(
+  id: string,
+  enabled = true,
+): UseQueryResult<RecurringTransactionEnvelope> {
+  return useQuery({
+    queryKey: financeKeys.recurringTransaction(id),
+    queryFn: ({ signal }) => financeApi.recurringTransaction(id, signal),
+    enabled: enabled && id !== '',
+  });
+}
+
+export function useFinanceRecurringOccurrences(
+  recurringId: string,
+  enabled = true,
+): UseQueryResult<RecurringOccurrenceListEnvelope> {
+  return useQuery({
+    queryKey: financeKeys.recurringOccurrences({ recurringTransactionId: recurringId }),
+    queryFn: ({ signal }) => financeApi.recurringOccurrences(recurringId, signal),
+    enabled: enabled && recurringId !== '',
+  });
+}
+
+export function useFinanceOccurrences(
+  params?: Partial<ListOccurrencesQuery>,
+  enabled = true,
+): UseQueryResult<RecurringOccurrenceListEnvelope> {
+  return useQuery({
+    queryKey: financeKeys.recurringOccurrences(params as unknown as Record<string, string | undefined>),
+    queryFn: ({ signal }) => financeApi.occurrences(params, signal),
+    enabled,
+  });
+}
+
+export function useFinanceForecast(
+  params?: Partial<ForecastQuery>,
+  enabled = true,
+): UseQueryResult<ForecastReportEnvelope> {
+  return useQuery({
+    queryKey: financeKeys.reports.forecast(params as unknown as Record<string, string | undefined>),
+    queryFn: ({ signal }) => financeApi.forecast(params, signal),
+    enabled,
   });
 }
 
