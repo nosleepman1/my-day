@@ -21,6 +21,9 @@ describe('DebtsController', () => {
     createRepayment: ReturnType<typeof vi.fn>;
     listRepayments: ReturnType<typeof vi.fn>;
     deleteRepayment: ReturnType<typeof vi.fn>;
+    cancel: ReturnType<typeof vi.fn>;
+    writeOff: ReturnType<typeof vi.fn>;
+    getSummary: ReturnType<typeof vi.fn>;
   };
   let mockTenant: {
     requireUserId: ReturnType<typeof vi.fn>;
@@ -59,6 +62,9 @@ describe('DebtsController', () => {
       createRepayment: vi.fn(),
       listRepayments: vi.fn(),
       deleteRepayment: vi.fn(),
+      cancel: vi.fn(),
+      writeOff: vi.fn(),
+      getSummary: vi.fn(),
     };
 
     mockTenant = {
@@ -185,5 +191,58 @@ describe('DebtsController', () => {
       DEBT_1,
       '01927000-0000-7000-8000-000000000050',
     );
+  });
+
+  it('getSummary delegates to service and returns data envelope', async () => {
+    const summaryResponse = {
+      currencies: [
+        {
+          currency: 'XOF' as const,
+          totalPayableMinor: '250000',
+          totalReceivableMinor: '0',
+          remainingPayableMinor: '250000',
+          remainingReceivableMinor: '0',
+          overduePayableMinor: '0',
+          overdueReceivableMinor: '0',
+        },
+      ],
+    };
+    mockService.getSummary.mockResolvedValue(summaryResponse);
+
+    const result = await controller.getSummary();
+
+    expect(mockTenant.requireUserId).toHaveBeenCalled();
+    expect(mockService.getSummary).toHaveBeenCalledWith(USER_1);
+    expect(result).toEqual({ data: summaryResponse });
+  });
+
+  it('cancel delegates to service with userId, id and body', async () => {
+    const cancelBody = { closingReason: 'Dette annulée' };
+    mockService.cancel.mockResolvedValue({
+      ...sampleDebtResponse,
+      status: 'CANCELLED',
+      closingReason: 'Dette annulée',
+    });
+
+    const result = await controller.cancel({ id: DEBT_1 }, cancelBody);
+
+    expect(mockTenant.requireUserId).toHaveBeenCalled();
+    expect(mockService.cancel).toHaveBeenCalledWith(USER_1, DEBT_1, cancelBody);
+    expect(result.data.status).toBe('CANCELLED');
+  });
+
+  it('writeOff delegates to service with userId, id and body', async () => {
+    const writeOffBody = { closingReason: 'Créance irrécouvrable' };
+    mockService.writeOff.mockResolvedValue({
+      ...sampleDebtResponse,
+      status: 'WRITTEN_OFF',
+      closingReason: 'Créance irrécouvrable',
+    });
+
+    const result = await controller.writeOff({ id: DEBT_1 }, writeOffBody);
+
+    expect(mockTenant.requireUserId).toHaveBeenCalled();
+    expect(mockService.writeOff).toHaveBeenCalledWith(USER_1, DEBT_1, writeOffBody);
+    expect(result.data.status).toBe('WRITTEN_OFF');
   });
 });

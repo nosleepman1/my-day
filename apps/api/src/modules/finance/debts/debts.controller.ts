@@ -15,6 +15,7 @@ import { ZodSerializerDto } from 'nestjs-zod';
 import type {
   DebtEnvelope,
   DebtListEnvelope,
+  DebtSummaryEnvelope,
   RepaymentEnvelope,
   RepaymentListEnvelope,
 } from '@orbit/contracts';
@@ -22,16 +23,19 @@ import type {
 import { Idempotent } from '../../../platform/idempotency/idempotent.decorator';
 import { TenantContext } from '../../../platform/tenant/tenant-context';
 import {
+  CancelDebtDto,
   CreateDebtDto,
   CreateRepaymentDto,
   DebtEnvelopeDto,
   DebtListEnvelopeDto,
   DebtRepaymentParamDto,
+  DebtSummaryEnvelopeDto,
   IdParamDto,
   ListDebtsQueryDto,
   RepaymentEnvelopeDto,
   RepaymentListEnvelopeDto,
   UpdateDebtDto,
+  WriteOffDebtDto,
 } from '../finance.dto';
 
 import { DebtsService } from './debts.service';
@@ -66,6 +70,13 @@ export class DebtsController {
     };
   }
 
+  @Get('summary')
+  @ZodSerializerDto(DebtSummaryEnvelopeDto)
+  async getSummary(): Promise<DebtSummaryEnvelope> {
+    const data = await this.debts.getSummary(this.tenant.requireUserId());
+    return { data };
+  }
+
   @Get(':id')
   @ZodSerializerDto(DebtEnvelopeDto)
   async getById(@Param() params: IdParamDto): Promise<DebtEnvelope> {
@@ -77,6 +88,22 @@ export class DebtsController {
   @ZodSerializerDto(DebtEnvelopeDto)
   async update(@Param() params: IdParamDto, @Body() body: UpdateDebtDto): Promise<DebtEnvelope> {
     const data = await this.debts.update(this.tenant.requireUserId(), params.id, body);
+    return { data };
+  }
+
+  @Post(':id/cancel')
+  @Idempotent()
+  @ZodSerializerDto(DebtEnvelopeDto)
+  async cancel(@Param() params: IdParamDto, @Body() body: CancelDebtDto): Promise<DebtEnvelope> {
+    const data = await this.debts.cancel(this.tenant.requireUserId(), params.id, body);
+    return { data };
+  }
+
+  @Post(':id/write-off')
+  @Idempotent()
+  @ZodSerializerDto(DebtEnvelopeDto)
+  async writeOff(@Param() params: IdParamDto, @Body() body: WriteOffDebtDto): Promise<DebtEnvelope> {
+    const data = await this.debts.writeOff(this.tenant.requireUserId(), params.id, body);
     return { data };
   }
 

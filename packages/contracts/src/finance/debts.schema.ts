@@ -71,6 +71,7 @@ export const CancelDebtSchema = z
   })
   .strict();
 export type CancelDebt = z.infer<typeof CancelDebtSchema>;
+export type CancelDebtInput = z.input<typeof CancelDebtSchema>;
 
 export const WriteOffDebtSchema = z
   .object({
@@ -78,6 +79,7 @@ export const WriteOffDebtSchema = z
   })
   .strict();
 export type WriteOffDebt = z.infer<typeof WriteOffDebtSchema>;
+export type WriteOffDebtInput = z.input<typeof WriteOffDebtSchema>;
 
 export const ListDebtsQuerySchema = PaginationQuerySchema.extend({
   type: DebtTypeSchema.optional(),

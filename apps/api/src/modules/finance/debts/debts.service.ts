@@ -1,17 +1,26 @@
 import { Injectable } from '@nestjs/common';
 
 import type {
+  CancelDebtInput,
   CreateDebt,
   CreateDebtInput,
   CreateRepayment,
   CreateRepaymentInput,
   CurrencyCode,
   DebtResponse,
+  DebtSummaryResponse,
   ListDebtsQuery,
   RepaymentResponse,
   UpdateDebt,
+  WriteOffDebtInput,
 } from '@orbit/contracts';
-import { CreateDebtSchema, CreateRepaymentSchema, UpdateDebtSchema } from '@orbit/contracts';
+import {
+  CancelDebtSchema,
+  CreateDebtSchema,
+  CreateRepaymentSchema,
+  UpdateDebtSchema,
+  WriteOffDebtSchema,
+} from '@orbit/contracts';
 
 import { AuditService } from '../../../platform/audit/audit.service';
 import { DomainError } from '../../../platform/errors/domain-error';
@@ -21,6 +30,15 @@ import { FinanceContext } from '../shared/finance-context';
 
 import type { CreateDebtDbParams, DebtWithRelations, RepaymentWithTransaction } from './debts.repository';
 import { DebtsRepository } from './debts.repository';
+
+interface CurrencySummaryAgg {
+  readonly totalPayable: bigint;
+  readonly totalReceivable: bigint;
+  readonly remainingPayable: bigint;
+  readonly remainingReceivable: bigint;
+  readonly overduePayable: bigint;
+  readonly overdueReceivable: bigint;
+}
 
 export function toRepaymentResponse(item: RepaymentWithTransaction): RepaymentResponse {
   return {
@@ -334,5 +352,124 @@ export class DebtsService {
     }
     const items = await this.repo.listRepayments(userId, debtId);
     return items.map(toRepaymentResponse);
+  }
+
+  async cancel(userId: string, id: string, rawInput: CancelDebtInput): Promise<DebtResponse> {
+    const input = CancelDebtSchema.parse(rawInput);
+    const debt = await this.repo.findById(userId, id);
+    if (!debt) {
+      throw new DomainError('NOT_FOUND', 'Dette introuvable.');
+    }
+    if (debt.status !== 'OPEN') {
+      throw new DomainError('INVALID_STATE_TRANSITION', "La dette n'est plus ouverte.");
+    }
+    const hasValidatedRepayments = debt.repayments.some((r) => r.transaction.status === 'VALIDATED');
+    if (hasValidatedRepayments) {
+      throw new DomainError(
+        'BUSINESS_RULE_VIOLATION',
+        "Impossible d'annuler une dette ayant des remboursements validés.",
+      );
+    }
+
+    const cancelled = await this.repo.cancel(userId, id, input.closingReason, this.ctx.now());
+
+    await this.audit.record({
+      action: 'finance.debt.cancel',
+      userId,
+      entityType: 'Debt',
+      entityId: id,
+      outcome: 'SUCCESS',
+      metadata: { closingReason: input.closingReason },
+    });
+
+    return toDebtResponse(cancelled, this.getTodayCivil());
+  }
+
+  async writeOff(userId: string, id: string, rawInput: WriteOffDebtInput): Promise<DebtResponse> {
+    const input = WriteOffDebtSchema.parse(rawInput);
+    const debt = await this.repo.findById(userId, id);
+    if (!debt) {
+      throw new DomainError('NOT_FOUND', 'Dette introuvable.');
+    }
+    if (debt.status !== 'OPEN') {
+      throw new DomainError('INVALID_STATE_TRANSITION', "La dette n'est plus ouverte.");
+    }
+    if (debt.type !== 'RECEIVABLE') {
+      throw new DomainError('BUSINESS_RULE_VIOLATION', 'Seule une créance peut être passée en perte.');
+    }
+
+    const writtenOff = await this.repo.writeOff(userId, id, input.closingReason, this.ctx.now());
+
+    await this.audit.record({
+      action: 'finance.debt.write_off',
+      userId,
+      entityType: 'Debt',
+      entityId: id,
+      outcome: 'SUCCESS',
+      metadata: { closingReason: input.closingReason },
+    });
+
+    return toDebtResponse(writtenOff, this.getTodayCivil());
+  }
+
+  private accumulateDebtSummary(
+    agg: CurrencySummaryAgg,
+    debt: DebtWithRelations,
+    todayCivil: string,
+  ): CurrencySummaryAgg {
+    const remaining = computeDebtRemaining(debt.principalMinor, debt.repayments);
+    const dueDateCivil = debt.dueDate ? debt.dueDate.toISOString().slice(0, 10) : null;
+    const overdue = isDebtOverdue({
+      dueDate: dueDateCivil,
+      remainingMinor: remaining,
+      status: debt.status,
+      todayCivil,
+    });
+
+    if (debt.type === 'PAYABLE') {
+      return {
+        ...agg,
+        totalPayable: agg.totalPayable + debt.principalMinor,
+        remainingPayable: agg.remainingPayable + remaining,
+        overduePayable: overdue ? agg.overduePayable + remaining : agg.overduePayable,
+      };
+    }
+
+    return {
+      ...agg,
+      totalReceivable: agg.totalReceivable + debt.principalMinor,
+      remainingReceivable: agg.remainingReceivable + remaining,
+      overdueReceivable: overdue ? agg.overdueReceivable + remaining : agg.overdueReceivable,
+    };
+  }
+
+  async getSummary(userId: string): Promise<DebtSummaryResponse> {
+    const debts = await this.repo.findOpenDebtsForSummary(userId);
+    const todayCivil = this.getTodayCivil();
+    const map = new Map<string, CurrencySummaryAgg>();
+
+    for (const debt of debts) {
+      const existing = map.get(debt.currency) ?? {
+        totalPayable: 0n,
+        totalReceivable: 0n,
+        remainingPayable: 0n,
+        remainingReceivable: 0n,
+        overduePayable: 0n,
+        overdueReceivable: 0n,
+      };
+      map.set(debt.currency, this.accumulateDebtSummary(existing, debt, todayCivil));
+    }
+
+    const currencies = Array.from(map.entries()).map(([currency, agg]) => ({
+      currency: currency as CurrencyCode,
+      totalPayableMinor: agg.totalPayable.toString(),
+      totalReceivableMinor: agg.totalReceivable.toString(),
+      remainingPayableMinor: agg.remainingPayable.toString(),
+      remainingReceivableMinor: agg.remainingReceivable.toString(),
+      overduePayableMinor: agg.overduePayable.toString(),
+      overdueReceivableMinor: agg.overdueReceivable.toString(),
+    }));
+
+    return { currencies };
   }
 }

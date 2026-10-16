@@ -564,4 +564,69 @@ export class DebtsRepository {
       },
     });
   }
+
+  async cancel(
+    userId: string,
+    id: string,
+    closingReason: string,
+    cancelledAt: Date,
+  ): Promise<DebtWithRelations> {
+    return this.ctx.db.debt.update({
+      where: { userId_id: { userId, id } },
+      data: {
+        status: 'CANCELLED',
+        closingReason,
+        cancelledAt,
+      },
+      include: {
+        counterparty: { select: { id: true, name: true, kind: true } },
+        repayments: {
+          select: {
+            amountMinor: true,
+            transaction: { select: { status: true } },
+          },
+        },
+      },
+    });
+  }
+
+  async writeOff(
+    userId: string,
+    id: string,
+    closingReason: string,
+    writtenOffAt: Date,
+  ): Promise<DebtWithRelations> {
+    return this.ctx.db.debt.update({
+      where: { userId_id: { userId, id } },
+      data: {
+        status: 'WRITTEN_OFF',
+        closingReason,
+        writtenOffAt,
+      },
+      include: {
+        counterparty: { select: { id: true, name: true, kind: true } },
+        repayments: {
+          select: {
+            amountMinor: true,
+            transaction: { select: { status: true } },
+          },
+        },
+      },
+    });
+  }
+
+  async findOpenDebtsForSummary(userId: string): Promise<DebtWithRelations[]> {
+    return this.ctx.db.debt.findMany({
+      where: { userId, status: 'OPEN' },
+      include: {
+        counterparty: { select: { id: true, name: true, kind: true } },
+        repayments: {
+          select: {
+            amountMinor: true,
+            transaction: { select: { status: true } },
+          },
+        },
+      },
+    });
+  }
 }
