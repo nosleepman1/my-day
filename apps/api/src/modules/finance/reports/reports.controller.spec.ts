@@ -48,6 +48,14 @@ const sampleCashFlow: CashFlowReport = {
   byMonth: [],
 };
 
+const sampleForecast = {
+  horizonDays: 90,
+  startDate: '2026-10-15',
+  endDate: '2027-01-13',
+  accounts: [],
+  occurrences: [],
+};
+
 describe('ReportsController', () => {
   let controller: ReportsController;
   let mockService: {
@@ -55,6 +63,7 @@ describe('ReportsController', () => {
     getBalances: ReturnType<typeof vi.fn>;
     getCategoryBreakdown: ReturnType<typeof vi.fn>;
     getCashFlow: ReturnType<typeof vi.fn>;
+    getForecast: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -63,6 +72,7 @@ describe('ReportsController', () => {
       getBalances: vi.fn().mockResolvedValue(sampleBalances),
       getCategoryBreakdown: vi.fn().mockResolvedValue(sampleCategoryBreakdown),
       getCashFlow: vi.fn().mockResolvedValue(sampleCashFlow),
+      getForecast: vi.fn().mockResolvedValue(sampleForecast),
     };
 
     controller = new ReportsController(mockService as unknown as ReportsService);
@@ -106,5 +116,12 @@ describe('ReportsController', () => {
     const res = await controller.getBalances({ asOf: '2026-10-15' });
     expect(res).toEqual({ data: sampleBalances });
     expect(mockService.getBalances).toHaveBeenCalledWith({ asOf: '2026-10-15' });
+  });
+
+  it('delegates getForecast to service', async () => {
+    const query = { horizon: 90, includeDebts: false };
+    const res = await controller.getForecast(query);
+    expect(res).toEqual({ data: sampleForecast });
+    expect(mockService.getForecast).toHaveBeenCalledWith(query);
   });
 });

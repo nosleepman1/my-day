@@ -6,6 +6,7 @@ import type {
   CashFlowEnvelope,
   CategoryBreakdownEnvelope,
   FinanceSummaryEnvelope,
+  ForecastReportEnvelope,
 } from '@orbit/contracts';
 
 import {
@@ -17,6 +18,8 @@ import {
   CategoryBreakdownQueryDto,
   FinanceSummaryEnvelopeDto,
   FinanceSummaryQueryDto,
+  ForecastQueryDto,
+  ForecastReportEnvelopeDto,
 } from '../finance.dto';
 
 import { ReportsService } from './reports.service';
@@ -51,6 +54,13 @@ export class ReportsController {
   @ZodSerializerDto(BalancesReportEnvelopeDto)
   async getBalances(@Query() query: BalancesReportQueryDto): Promise<BalancesReportEnvelope> {
     const data = await this.reports.getBalances(query);
+    return { data };
+  }
+
+  @Get('forecast')
+  @ZodSerializerDto(ForecastReportEnvelopeDto)
+  async getForecast(@Query() query: ForecastQueryDto): Promise<ForecastReportEnvelope> {
+    const data = await this.reports.getForecast(query);
     return { data };
   }
 }

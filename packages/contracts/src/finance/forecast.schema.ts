@@ -16,6 +16,7 @@ export const ForecastQuerySchema = z.object({
   includeDebts: z.coerce.boolean().default(false),
 });
 export type ForecastQuery = z.infer<typeof ForecastQuerySchema>;
+export type ForecastQueryInput = z.input<typeof ForecastQuerySchema>;
 
 export const ForecastAccountPointSchema = z.object({
   date: CivilDateSchema,

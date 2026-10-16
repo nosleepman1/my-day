@@ -13,6 +13,9 @@ import type {
   CurrencySummaryItem,
   FinanceSummaryQuery,
   FinanceSummaryReport,
+  ForecastAccountSummary,
+  ForecastQueryInput,
+  ForecastReportResponse,
   MonthlyCashFlow,
 } from '@orbit/contracts';
 import {
@@ -20,10 +23,19 @@ import {
   CashFlowQuerySchema,
   CategoryBreakdownQuerySchema,
   FinanceSummaryQuerySchema,
+  ForecastQuerySchema,
 } from '@orbit/contracts';
 
 import { DomainError } from '../../../platform/errors/domain-error';
 import { AccountsRepository } from '../accounts/accounts.repository';
+import type { DebtWithRelations } from '../debts/debts.repository';
+import { toDebtResponse } from '../debts/debts.service';
+import { computeDebtRemaining } from '../domain/debt-rules';
+import type { ProjectionDebtInput, ProjectionOccurrenceInput } from '../domain/forecast-projector';
+import { projectAccountCashflow } from '../domain/forecast-projector';
+import { generateOccurrences } from '../domain/recurrence-rules';
+import type { OccurrenceWithRelations } from '../recurring/recurring.repository';
+import { toOccurrenceResponse } from '../recurring/recurring.service';
 import { FinanceContext } from '../shared/finance-context';
 
 interface RawTxItem {
@@ -348,6 +360,230 @@ export class ReportsService {
       netCashFlowMinor: (aggregates.totalIncome - aggregates.totalExpense).toString(),
       byEconomicClass: aggregates.byEconomicClass,
       byMonth: aggregates.byMonth,
+    };
+  }
+
+  private async materializeActiveRecurrences(userId: string, endDate: string): Promise<void> {
+    const activeRecurrings = await this.ctx.db.recurringTransaction.findMany({
+      where: { userId, status: 'ACTIVE' },
+    });
+
+    for (const rec of activeRecurrings) {
+      const anchor = rec.recurrenceAnchorOn.toISOString().slice(0, 10);
+      const dates = generateOccurrences({
+        recurrenceRule: rec.recurrenceRule,
+        anchorDate: anchor,
+        fromDate: anchor,
+        toDate: endDate,
+      });
+
+      if (dates.length > 0) {
+        await this.ctx.db.recurringOccurrence.createMany({
+          data: dates.map((dueOnCivil) => ({
+            id: this.ctx.newId(),
+            userId,
+            recurringTransactionId: rec.id,
+            dueOn: new Date(`${dueOnCivil}T00:00:00.000Z`),
+            expectedAmountMinor: rec.amountMinor,
+            currency: rec.currency,
+            status: 'EXPECTED',
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+  }
+
+  private async loadForecastOccurrences(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<OccurrenceWithRelations[]> {
+    return this.ctx.db.recurringOccurrence.findMany({
+      where: {
+        userId,
+        dueOn: {
+          gte: new Date(`${startDate}T00:00:00.000Z`),
+          lte: new Date(`${endDate}T00:00:00.000Z`),
+        },
+      },
+      include: {
+        recurringTransaction: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            economicClass: true,
+            accountId: true,
+            destinationAccountId: true,
+            categoryId: true,
+            counterpartyId: true,
+            projectId: true,
+          },
+        },
+      },
+      orderBy: [{ dueOn: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  private async loadForecastDebts(
+    userId: string,
+    startDate: string,
+    endDate: string,
+    includeDebts: boolean,
+  ): Promise<DebtWithRelations[]> {
+    if (!includeDebts) return [];
+
+    return this.ctx.db.debt.findMany({
+      where: {
+        userId,
+        status: 'OPEN',
+        dueDate: {
+          gte: new Date(`${startDate}T00:00:00.000Z`),
+          lte: new Date(`${endDate}T00:00:00.000Z`),
+        },
+      },
+      include: {
+        repayments: {
+          include: { transaction: { select: { status: true } } },
+        },
+        counterparty: { select: { id: true, name: true, kind: true } },
+      },
+      orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  private async loadForecastAccounts(userId: string, accountId?: string, currency?: string) {
+    const where: { userId: string; archivedAt: null; id?: string; currency?: string } = {
+      userId,
+      archivedAt: null,
+    };
+    if (accountId) where.id = accountId;
+    if (currency) where.currency = currency;
+
+    return this.ctx.db.financialAccount.findMany({
+      where,
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  private extractAccountOccurrences(
+    occurrences: readonly OccurrenceWithRelations[],
+    accountId: string,
+  ): ProjectionOccurrenceInput[] {
+    const results: ProjectionOccurrenceInput[] = [];
+    for (const occ of occurrences) {
+      const rec = occ.recurringTransaction;
+      if (!rec) continue;
+      if (rec.type !== 'INCOME' && rec.type !== 'EXPENSE' && rec.type !== 'TRANSFER') continue;
+      const dueOnStr = occ.dueOn.toISOString().slice(0, 10);
+
+      if (rec.accountId === accountId) {
+        results.push({
+          dueOn: dueOnStr,
+          expectedAmountMinor: occ.expectedAmountMinor,
+          type: rec.type,
+          direction: rec.type === 'TRANSFER' ? 'DEBIT' : undefined,
+          status: occ.status,
+        });
+      } else if (rec.destinationAccountId === accountId && rec.type === 'TRANSFER') {
+        results.push({
+          dueOn: dueOnStr,
+          expectedAmountMinor: occ.expectedAmountMinor,
+          type: 'TRANSFER',
+          direction: 'CREDIT',
+          status: occ.status,
+        });
+      }
+    }
+    return results;
+  }
+
+  private extractAccountDebts(
+    debts: readonly DebtWithRelations[],
+    accountCurrency: string,
+  ): ProjectionDebtInput[] {
+    const results: ProjectionDebtInput[] = [];
+    for (const debt of debts) {
+      if (debt.currency !== accountCurrency || !debt.dueDate) continue;
+      const repaymentsList = debt.repayments.map((r) => ({
+        amountMinor: r.amountMinor,
+        transactionStatus: r.transaction.status,
+      }));
+      const remaining = computeDebtRemaining(debt.principalMinor, repaymentsList);
+      if (remaining > 0n) {
+        results.push({
+          dueDate: debt.dueDate.toISOString().slice(0, 10),
+          remainingMinor: remaining,
+          type: debt.type,
+        });
+      }
+    }
+    return results;
+  }
+
+  private projectSingleAccount(params: {
+    account: { id: string; name: string; currency: string };
+    currentBalanceMinor: bigint;
+    startDate: string;
+    endDate: string;
+    occurrences: readonly OccurrenceWithRelations[];
+    debts: readonly DebtWithRelations[];
+  }): ForecastAccountSummary {
+    const { account, currentBalanceMinor, startDate, endDate, occurrences, debts } = params;
+    const accountOccurrences = this.extractAccountOccurrences(occurrences, account.id);
+    const accountDebts = this.extractAccountDebts(debts, account.currency);
+
+    return projectAccountCashflow({
+      accountId: account.id,
+      accountName: account.name,
+      currency: account.currency as CurrencyCode,
+      currentBalanceMinor,
+      startDate,
+      endDate,
+      occurrences: accountOccurrences,
+      debts: accountDebts,
+    });
+  }
+
+  async getForecast(rawQuery: ForecastQueryInput): Promise<ForecastReportResponse> {
+    const query = ForecastQuerySchema.parse(rawQuery);
+    const userId = this.ctx.userId();
+    const horizonDays = query.horizon;
+    const startDate = this.ctx.now().toISOString().slice(0, 10);
+    const startEpoch = Date.parse(`${startDate}T00:00:00.000Z`);
+    const endDate = new Date(startEpoch + horizonDays * 86_400_000).toISOString().slice(0, 10);
+
+    await this.materializeActiveRecurrences(userId, endDate);
+
+    const occurrences = await this.loadForecastOccurrences(userId, startDate, endDate);
+    const debts = await this.loadForecastDebts(userId, startDate, endDate, query.includeDebts);
+
+    const accounts = await this.loadForecastAccounts(userId, query.accountId, query.currency);
+    const accountSummaries: ForecastAccountSummary[] = [];
+
+    const asOfDate = new Date(`${startDate}T23:59:59.999Z`);
+    for (const acc of accounts) {
+      const balance = await this.accountsRepo.getClearedBalance(userId, acc.id, asOfDate);
+      const currentBalanceMinor = balance?.clearedBalanceMinor ?? acc.openingBalanceMinor;
+      const summary = this.projectSingleAccount({
+        account: acc,
+        currentBalanceMinor,
+        startDate,
+        endDate,
+        occurrences,
+        debts,
+      });
+      accountSummaries.push(summary);
+    }
+
+    return {
+      horizonDays,
+      startDate,
+      endDate,
+      accounts: accountSummaries,
+      occurrences: occurrences.map((occ) => toOccurrenceResponse(occ, startDate)),
+      debts: query.includeDebts ? debts.map((d) => toDebtResponse(d, startDate)) : undefined,
     };
   }
 }

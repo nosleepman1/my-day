@@ -15,11 +15,22 @@ describe('ReportsService', () => {
   let mockCtx: {
     userId: () => string;
     now: () => Date;
+    newId: () => string;
     db: {
       transaction: {
         findMany: ReturnType<typeof vi.fn>;
       };
       financialAccount: {
+        findMany: ReturnType<typeof vi.fn>;
+      };
+      recurringTransaction: {
+        findMany: ReturnType<typeof vi.fn>;
+      };
+      recurringOccurrence: {
+        createMany: ReturnType<typeof vi.fn>;
+        findMany: ReturnType<typeof vi.fn>;
+      };
+      debt: {
         findMany: ReturnType<typeof vi.fn>;
       };
     };
@@ -32,12 +43,23 @@ describe('ReportsService', () => {
     mockCtx = {
       userId: () => USER_ID,
       now: () => new Date('2026-10-15T12:00:00.000Z'),
+      newId: vi.fn(() => '01927000-0000-7000-8000-000000000099'),
       db: {
         transaction: {
           findMany: vi.fn(),
         },
         financialAccount: {
           findMany: vi.fn(),
+        },
+        recurringTransaction: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+        recurringOccurrence: {
+          createMany: vi.fn().mockResolvedValue({ count: 0 }),
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+        debt: {
+          findMany: vi.fn().mockResolvedValue([]),
         },
       },
     };
@@ -211,6 +233,111 @@ describe('ReportsService', () => {
       expect(res.byMonth).toHaveLength(1);
       expect(res.byMonth[0]?.month).toBe('2026-01');
       expect(res.byMonth[0]?.netMinor).toBe('60000');
+    });
+  });
+
+  describe('getForecast', () => {
+    it('returns cashflow forecast projection across accounts and occurrences', async () => {
+      mockCtx.db.financialAccount.findMany.mockResolvedValueOnce([
+        {
+          id: ACCOUNT_1,
+          name: 'Compte Principal',
+          type: 'CHECKING',
+          currency: 'XOF',
+          openingBalanceMinor: 100_000n,
+          archivedAt: null,
+        },
+      ]);
+
+      mockAccountsRepo.getClearedBalance.mockResolvedValueOnce({
+        clearedBalanceMinor: 100_000n,
+      });
+
+      mockCtx.db.recurringOccurrence.findMany.mockResolvedValueOnce([
+        {
+          id: '01927000-0000-7000-8000-000000000050',
+          userId: USER_ID,
+          recurringTransactionId: '01927000-0000-7000-8000-000000000010',
+          dueOn: new Date('2026-10-20T00:00:00.000Z'),
+          expectedAmountMinor: 30_000n,
+          currency: 'XOF',
+          status: 'EXPECTED',
+          transactionId: null,
+          confirmedAt: null,
+          skippedAt: null,
+          createdAt: new Date('2026-10-01T10:00:00.000Z'),
+          recurringTransaction: {
+            id: '01927000-0000-7000-8000-000000000010',
+            name: 'Loyer Bureau',
+            type: 'EXPENSE',
+            economicClass: 'EXPENSE_OPERATING',
+            accountId: ACCOUNT_1,
+            destinationAccountId: null,
+          },
+        },
+      ]);
+
+      const res = await service.getForecast({
+        horizon: 30,
+        currency: 'XOF',
+      });
+
+      expect(res.horizonDays).toBe(30);
+      expect(res.startDate).toBe('2026-10-15');
+      expect(res.accounts).toHaveLength(1);
+      expect(res.accounts[0]?.accountId).toBe(ACCOUNT_1);
+      expect(res.accounts[0]?.currentBalanceMinor).toBe('100000');
+      expect(res.accounts[0]?.projectedEndBalanceMinor).toBe('70000');
+      expect(res.occurrences).toHaveLength(1);
+      expect(res.debts).toBeUndefined();
+    });
+
+    it('incorporates open debts when includeDebts is true', async () => {
+      mockCtx.db.financialAccount.findMany.mockResolvedValueOnce([
+        {
+          id: ACCOUNT_1,
+          name: 'Compte Principal',
+          type: 'CHECKING',
+          currency: 'XOF',
+          openingBalanceMinor: 50_000n,
+          archivedAt: null,
+        },
+      ]);
+
+      mockAccountsRepo.getClearedBalance.mockResolvedValueOnce({
+        clearedBalanceMinor: 50_000n,
+      });
+
+      mockCtx.db.debt.findMany.mockResolvedValueOnce([
+        {
+          id: '01927000-0000-7000-8000-000000000070',
+          userId: USER_ID,
+          type: 'RECEIVABLE',
+          counterpartyId: null,
+          title: 'Prêt ami',
+          description: null,
+          principalMinor: 20_000n,
+          currency: 'XOF',
+          openedOn: new Date('2026-10-01'),
+          dueDate: new Date('2026-10-25T00:00:00.000Z'),
+          status: 'OPEN',
+          notes: null,
+          createdAt: new Date('2026-10-01'),
+          updatedAt: new Date('2026-10-01'),
+          repayments: [],
+          counterparty: null,
+        },
+      ]);
+
+      const res = await service.getForecast({
+        horizon: 30,
+        currency: 'XOF',
+        includeDebts: true,
+      });
+
+      expect(res.accounts[0]?.projectedEndBalanceMinor).toBe('70000');
+      expect(res.debts).toBeDefined();
+      expect(res.debts).toHaveLength(1);
     });
   });
 });

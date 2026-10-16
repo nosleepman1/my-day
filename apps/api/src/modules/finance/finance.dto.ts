@@ -33,6 +33,8 @@ import {
   DebtSummaryEnvelopeSchema,
   FinanceSummaryEnvelopeSchema,
   FinanceSummaryQuerySchema,
+  ForecastQuerySchema,
+  ForecastReportEnvelopeSchema,
   IdParamSchema,
   ListAccountsQuerySchema,
   ListCategoriesQuerySchema,
@@ -147,3 +149,6 @@ export class SkipOccurrenceDto extends createZodDto(SkipOccurrenceSchema) {}
 export class ListOccurrencesQueryDto extends createZodDto(ListOccurrencesQuerySchema) {}
 export class RecurringOccurrenceEnvelopeDto extends createZodDto(RecurringOccurrenceEnvelopeSchema) {}
 export class RecurringOccurrenceListEnvelopeDto extends createZodDto(RecurringOccurrenceListEnvelopeSchema) {}
+
+export class ForecastQueryDto extends createZodDto(ForecastQuerySchema) {}
+export class ForecastReportEnvelopeDto extends createZodDto(ForecastReportEnvelopeSchema) {}
